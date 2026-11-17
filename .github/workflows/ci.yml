@@ -26,7 +26,10 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       CI: "true"
-      DATABASE_URL: postgres://yanmu:yanmu@localhost:5432/yanmu
+      # The app connects as a limited role so row-level security applies; migrations run as the owner.
+      DATABASE_URL: postgres://yanmu_app:yanmu_app_ci@localhost:5432/yanmu
+      MIGRATION_DATABASE_URL: postgres://yanmu:yanmu@localhost:5432/yanmu
+      APP_DB_PASSWORD: yanmu_app_ci
       BETTER_AUTH_SECRET: ci-only-secret-0123456789abcdefghijklmnop
       BETTER_AUTH_URL: http://localhost:3000
       DEV_USER_PASSWORD: Yanmu-ci-2026!
@@ -50,8 +53,10 @@ jobs:
         run: pnpm test
       - name: Migrations are up to date with the schema
         run: pnpm db:generate && git diff --exit-code -- drizzle
-      - name: Apply migrations
-        run: pnpm db:migrate
+      - name: Apply migrations and base data
+        run: pnpm db:setup
+      - name: Database tests (branch isolation, permissions, audit log)
+        run: pnpm test:db
       - name: Build
         run: pnpm build
       - name: Install browser

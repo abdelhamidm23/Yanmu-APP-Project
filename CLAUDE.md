@@ -52,19 +52,24 @@ Next.js 16 (App Router) + TypeScript · Tailwind CSS 4 (logical properties) · n
 | `src/lib/auth.ts` | Better Auth config (12 h sessions, TOTP, rate limits, no self sign-up). |
 | `src/lib/format.ts` | Piastres ↔ EGP, Arabic/Latin digits, Cairo time. |
 | `src/db/schema.ts` | Drizzle schema. After changing it run `pnpm db:generate` and commit the SQL. |
+| `drizzle/0002_phase1_rls_audit.sql` | Hand-written: the `yanmu_app` role, RLS helper functions, policies, audit and `updated_at` triggers, `is_working_day()`. |
+| `src/db/rls.ts` | `withUserDb(userId, fn, { reason })`: every app query runs inside it so RLS knows who is asking. |
+| `src/lib/settings.ts` | Every adjustable threshold (spec §17.3) with its default and validation. |
+| `src/lib/permissions.ts` | Server-side permission checks that mirror the RLS policies. |
 | `src/messages/{ar,en}.json` | All UI text. Arabic is written, not machine-translated. Keys must match (unit-tested). |
 | `src/app/globals.css` | Design tokens from spec §12. Colour is for status only; no gold, gradients or shadows. |
-| `scripts/` | `migrate.ts`, `seed-dev-users.ts` (dev only), `check-logical-css.ts` (rule 8). |
-| `tests/unit/`, `e2e/` | Vitest unit tests; Playwright tests on a 390 px phone and desktop. |
+| `scripts/` | `migrate.ts`, `seed-base.ts` (organization, branches, age bands, setting defaults), `seed-dev-users.ts` (dev only), `check-logical-css.ts` (rule 8). |
+| `tests/unit/`, `tests/db/`, `e2e/` | Vitest unit tests; database tests for RLS and audit (`pnpm test:db`); Playwright tests on a 390 px phone and desktop. |
 
 ## Commands
 
 ```bash
 pnpm install
-pnpm db:migrate          # apply migrations (needs DATABASE_URL)
+pnpm db:setup            # migrations + base data (needs MIGRATION_DATABASE_URL, APP_DB_PASSWORD)
 pnpm seed:dev-users      # one test account per role (dev only)
 pnpm dev                 # http://localhost:3000
 pnpm lint && pnpm lint:rtl && pnpm typecheck && pnpm test   # fast checks
+pnpm test:db             # RLS / branch isolation / audit (needs the database)
 pnpm test:e2e            # end-to-end (starts the dev server; resets test accounts)
 ```
 
@@ -77,10 +82,20 @@ pnpm test:e2e            # end-to-end (starts the dev server; resets test accoun
 - Use real `<button>`, `<a>`, `<label>`; icon-only buttons need `aria-label`.
 - Figures use the `figure` class (tabular numbers). Format money with `formatPiastres`, never with floats.
 - Never log or send personal data to services outside Egypt (rules 9 and 10). Next.js telemetry is disabled in Docker and CI.
+- **Database access.** The app connects as `yanmu_app` (no ownership, no BYPASSRLS). Run every query through `withUserDb(user.id, tx => …)`; without it RLS returns nothing. Pass `{ reason }` for changes worth explaining in the audit log.
+- **Every new table** needs, in a hand-written migration: `ENABLE ROW LEVEL SECURITY`, policies for each action the app may take, `GRANT`s to `yanmu_app`, the `audit_row()` trigger, and (if it has `branch_id`) a case in `tests/db/rls.test.ts` proving another branch cannot read or write it. Add it to `src/db/audit-tables.ts` and `settings.audit.tables.*`.
+- Server actions return to the page with `?ok=1` or `?error=<code>` via `runAndReturn`. Never put secrets (like temporary passwords) in a URL.
+- Message keys must not contain dots; next-intl treats a dot as nesting (unit-tested).
 
 ## Phase 0 decisions and open points
 
 - Sign-in is by email + password. MFA (authenticator app) is enforced for owner, company manager, accountant and HR (spec §14). Per-person PIN on shared class phones comes with the class-phone screens in Phase 3.
 - `/` always opens Arabic. The language chosen on the sign-in screen (or in More) is saved per person.
 - HR is not in the spec §11.1 nav table; its shell is Staff · Attendance · More until the owner decides.
-- `user_branch_role.branch_id` has no foreign key yet; Phase 1 adds `branch` and the key, RLS policies and the audit trigger.
+
+## Phase 1 decisions
+
+- Branches are seeded as "Branch A" and "Branch B" until the owner gives the real names; rename them in Settings → Branches.
+- Settings (users, branches, rooms, age bands, thresholds, audit log) are for the owner and company manager. Branch managers manage holidays for their own branch. Only the owner can grant the owner role; nobody changes their own roles.
+- The weekly working days are organization-wide (default Sunday–Thursday); holidays and extra working days are per branch.
+- Ending a user's access (end date) signs them out everywhere. Password and two-step resets also sign the person out.

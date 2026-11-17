@@ -69,7 +69,7 @@ export function SetupMfaFlow() {
         </ol>
         <TextField id="password" name="password" type="password" label={t("confirmPassword")} autoComplete="current-password" dir="ltr" required />
         {error ? <Alert>{error}</Alert> : null}
-        <Button type="submit" full disabled={busy}>
+        <Button data-testid="mfa-start" type="submit" full disabled={busy}>
           {busy ? t("starting") : t("start")}
         </Button>
       </form>
@@ -90,7 +90,7 @@ export function SetupMfaFlow() {
         </div>
         <TextField id="code" name="code" label={tAuth("code")} autoComplete="one-time-code" inputMode="numeric" maxLength={6} dir="ltr" required />
         {error ? <Alert>{error}</Alert> : null}
-        <Button type="submit" full disabled={busy}>
+        <Button data-testid="mfa-confirm" type="submit" full disabled={busy}>
           {busy ? tAuth("verifying") : t("finish")}
         </Button>
       </form>
@@ -107,7 +107,7 @@ export function SetupMfaFlow() {
           <li key={c}>{c}</li>
         ))}
       </ul>
-      <Button full onClick={() => {
+      <Button data-testid="mfa-done" full onClick={() => {
           router.replace("/");
           router.refresh();
         }}>

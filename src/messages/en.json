@@ -151,5 +151,269 @@
     "mfaOff": "Two-step sign-in is off",
     "setUpMfa": "Turn it on",
     "saved": "Saved"
+  },
+  "settings": {
+    "title": "Settings",
+    "open": "Settings",
+    "moreLink": "Branches, rooms, users, calendar and audit log",
+    "menu": {
+      "branches": "Branches and rooms",
+      "branchesHelp": "Names, licence, capacity and rooms per branch.",
+      "ageBands": "Age bands and ratios",
+      "ageBandsHelp": "Age ranges and children per carer.",
+      "calendar": "Calendar",
+      "calendarHelp": "Working days, holidays, academic years and terms.",
+      "users": "Users and roles",
+      "usersHelp": "Who can sign in, and what they can see.",
+      "values": "Thresholds",
+      "valuesHelp": "Late fees, approval limits, alert times.",
+      "audit": "Audit log",
+      "auditHelp": "Every change: who, when, before and after."
+    },
+    "result": {
+      "ok": "Saved.",
+      "forbidden": "You are not allowed to make this change.",
+      "duplicate": "That already exists.",
+      "invalid": "Some values are not valid. Check the fields and try again.",
+      "unknown": "Could not save. Try again.",
+      "self": "You cannot change your own roles. Ask another manager.",
+      "notFound": "Not found."
+    },
+    "common": {
+      "save": "Save",
+      "add": "Add",
+      "remove": "Remove",
+      "edit": "Edit",
+      "back": "Back",
+      "active": "Active",
+      "inactive": "Inactive",
+      "nameAr": "Name (Arabic)",
+      "nameEn": "Name (English)",
+      "exportExcel": "Export to Excel",
+      "none": "None yet.",
+      "allBranches": "All branches",
+      "branch": "Branch",
+      "yes": "Yes",
+      "no": "No",
+      "note": "Note",
+      "date": "Date"
+    },
+    "branches": {
+      "title": "Branches and rooms",
+      "code": "Code",
+      "licensedCapacity": "Licensed capacity",
+      "physicalCapacity": "Physical capacity",
+      "licenceNo": "Licence number",
+      "licenceExpiry": "Licence expiry",
+      "rooms": "Rooms",
+      "roomCount": "{count, plural, =0 {No rooms} one {# room} other {# rooms}}",
+      "addBranch": "Add a branch",
+      "details": "Branch details",
+      "isActive": "Branch is open"
+    },
+    "rooms": {
+      "title": "Rooms",
+      "ageBand": "Age band",
+      "capacity": "Capacity",
+      "addRoom": "Add a room",
+      "isActive": "Room in use",
+      "capacityHint": "Children this room can take."
+    },
+    "ageBands": {
+      "title": "Age bands and ratios",
+      "minAge": "From (months)",
+      "maxAge": "Up to (months, not included)",
+      "ratio": "Children per carer",
+      "ratioDisplay": "1 : {count}"
+    },
+    "calendar": {
+      "title": "Calendar",
+      "workingDays": "Working days",
+      "workingDaysHelp": "Days the nurseries are open every week. Applies to late fees and attendance.",
+      "days": {
+        "sun": "Sunday",
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday"
+      },
+      "exceptions": "Holidays and extra working days",
+      "exceptionsHelp": "A holiday closes the branch on a usual working day; an extra working day opens it on a usual day off.",
+      "kind": "Type",
+      "holiday": "Holiday",
+      "extraDay": "Extra working day",
+      "addException": "Add",
+      "academicYears": "Academic years and terms",
+      "label": "Name",
+      "startsOn": "Starts",
+      "endsOn": "Ends",
+      "addYear": "Add an academic year",
+      "terms": "Terms",
+      "addTerm": "Add a term"
+    },
+    "users": {
+      "title": "Users and roles",
+      "name": "Full name",
+      "email": "Email",
+      "phone": "Phone",
+      "language": "Language",
+      "roles": "Roles",
+      "rolesHelp": "Tick each role and where it applies. “All branches” gives access to every branch.",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusEnded": "Access ended",
+      "mfa": "Two-step sign-in",
+      "mfaOn": "On",
+      "mfaOff": "Off",
+      "addUser": "Add a user",
+      "newUser": "New user",
+      "endDate": "Access ends on",
+      "endDateHint": "Leave empty while the person works here. Access stops at 00:00 on this date.",
+      "created": "User created. Give them this temporary password (shown once):",
+      "tempPassword": "Temporary password",
+      "resetPassword": "Make a new temporary password",
+      "passwordReset": "New temporary password (shown once):",
+      "resetMfa": "Turn off two-step sign-in",
+      "resetMfaHelp": "Use when someone lost their phone. They set it up again at their next sign-in.",
+      "mfaReset": "Two-step sign-in was turned off for this user.",
+      "noRoles": "No roles",
+      "edit": "Edit user"
+    },
+    "values": {
+      "title": "Thresholds",
+      "help": "Defaults from the plan. Changes apply from now on and are recorded in the audit log.",
+      "groups": {
+        "billing": "Billing and late fees",
+        "calendar": "Calendar",
+        "approvals": "Spending and approvals",
+        "capacity": "Children",
+        "operations": "Daily operations",
+        "alerts": "Alerts"
+      },
+      "egp": "EGP",
+      "minutes": "minutes",
+      "noCap": "Empty = no cap",
+      "keys": {
+        "billing": {
+          "invoice_day": "Invoice day of the month",
+          "due_day": "Due day of the month"
+        },
+        "late_fee": {
+          "daily_piastres": "Late fee per working day",
+          "basis": "Late fee charged",
+          "cap_piastres": "Late fee cap per invoice"
+        },
+        "calendar": {
+          "working_days": "Working days"
+        },
+        "approvals": {
+          "branch_manager_limit_piastres": "Branch manager can spend without approval up to",
+          "unusual_multiplier": "Unusual if more than this × the 3-month average"
+        },
+        "expenses": {
+          "photo_required_from_piastres": "Receipt photo required from"
+        },
+        "age_band": {
+          "move_up_notice_days": "“Ready to move up” notice (days before)",
+          "leaving_notice_days": "“Leaving age” notice (days before)"
+        },
+        "ratio": {
+          "snapshot_time": "Ratio check time"
+        },
+        "daily_close": {
+          "prompt_time": "Daily close opens at",
+          "due_time": "Daily close due by",
+          "alert_time": "Alert if not closed by"
+        },
+        "cash": {
+          "variance_alert_piastres": "Cash box difference that triggers an alert"
+        },
+        "alerts": {
+          "critical_repeat_minutes": "Repeat critical alerts every",
+          "step_to_company_manager_minutes": "Escalate to company manager after",
+          "step_to_owner_minutes": "Escalate to owner after",
+          "quiet_hours_start": "Quiet hours start",
+          "quiet_hours_end": "Quiet hours end"
+        },
+        "attention": {
+          "overdue_days": "Flag families overdue for more than (days)",
+          "overdue_amount_piastres": "Flag families owing more than"
+        }
+      },
+      "choices": {
+        "per_invoice": "Per child (each invoice)",
+        "per_family": "Per family"
+      }
+    },
+    "audit": {
+      "title": "Audit log",
+      "help": "Every change in the app, newest first. Entries cannot be edited or deleted.",
+      "when": "When",
+      "who": "Who",
+      "what": "What",
+      "changes": "Changes",
+      "system": "System",
+      "allTables": "Everything",
+      "filter": "Show",
+      "older": "Older entries",
+      "newest": "Newest",
+      "actions": {
+        "insert": "Added",
+        "update": "Changed",
+        "delete": "Removed"
+      },
+      "tables": {
+        "organization": "Organization",
+        "branch": "Branch",
+        "age_band": "Age band",
+        "room": "Room",
+        "academic_year": "Academic year",
+        "term": "Term",
+        "calendar_day": "Calendar day",
+        "setting": "Setting",
+        "user_branch_role": "User role",
+        "app_user": "User"
+      },
+      "fields": {
+        "full_name": "Name",
+        "name_ar": "Name (Arabic)",
+        "name_en": "Name (English)",
+        "email": "Email",
+        "phone": "Phone",
+        "locale": "Language",
+        "digits": "Digits",
+        "mfa_enabled": "Two-step sign-in",
+        "end_date": "Access ends on",
+        "credentials_reset_at": "Temporary password made",
+        "is_safeguarding_lead": "Safeguarding lead",
+        "role": "Role",
+        "branch_id": "Branch",
+        "user_id": "User",
+        "code": "Code",
+        "licensed_capacity": "Licensed capacity",
+        "physical_capacity": "Physical capacity",
+        "licence_no": "Licence number",
+        "licence_expiry": "Licence expiry",
+        "is_active": "In use",
+        "capacity": "Capacity",
+        "age_band_id": "Age band",
+        "children_per_staff": "Children per carer",
+        "min_age_months": "From (months)",
+        "max_age_months": "Up to (months)",
+        "sort": "Order",
+        "date": "Date",
+        "is_working_day": "Working day",
+        "note": "Note",
+        "label": "Name",
+        "starts_on": "Starts",
+        "ends_on": "Ends",
+        "academic_year_id": "Academic year",
+        "key": "Setting",
+        "value": "Value",
+        "timezone": "Time zone"
+      }
+    }
   }
 }

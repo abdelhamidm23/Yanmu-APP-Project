@@ -2,8 +2,8 @@ import "server-only";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
 import { userBranchRole } from "@/db/schema";
+import { withUserDb } from "@/db/rls";
 import { auth } from "./auth";
 import { isRole, primaryRole, requiresMfa, type Role } from "./roles";
 
@@ -17,6 +17,8 @@ export interface CurrentUser {
   digits: "arabic" | "latin";
   mfaEnabled: boolean;
   roles: Role[];
+  /** Each role with its branch (null = all branches). */
+  grants: { role: Role; branchId: string | null }[];
   activeRole: Role | null;
   mustSetUpMfa: boolean;
 }
@@ -31,11 +33,13 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const endDate = u.endDate ? new Date(u.endDate) : null;
   if (endDate && endDate.getTime() <= Date.now()) return null;
 
-  const rows = await db
-    .select({ role: userBranchRole.role })
-    .from(userBranchRole)
-    .where(eq(userBranchRole.userId, u.id));
-  const roles = Array.from(new Set(rows.map((r) => r.role)));
+  const grants = await withUserDb(u.id, (tx) =>
+    tx
+      .select({ role: userBranchRole.role, branchId: userBranchRole.branchId })
+      .from(userBranchRole)
+      .where(eq(userBranchRole.userId, u.id)),
+  );
+  const roles = Array.from(new Set(grants.map((r) => r.role)));
 
   const cookieRole = (await cookies()).get(ACTIVE_ROLE_COOKIE)?.value;
   const activeRole = isRole(cookieRole) && roles.includes(cookieRole) ? cookieRole : primaryRole(roles);
@@ -49,6 +53,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     digits: u.digits === "arabic" ? "arabic" : "latin",
     mfaEnabled,
     roles,
+    grants,
     activeRole,
     mustSetUpMfa: requiresMfa(roles) && !mfaEnabled,
   };

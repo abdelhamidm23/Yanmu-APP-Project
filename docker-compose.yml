@@ -26,7 +26,10 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://yanmu:yanmu@db:5432/yanmu
+      # The app uses a limited role so row-level security applies; migrations use the owner.
+      DATABASE_URL: postgres://yanmu_app:yanmu_app_dev@db:5432/yanmu
+      MIGRATION_DATABASE_URL: postgres://yanmu:yanmu@db:5432/yanmu
+      APP_DB_PASSWORD: yanmu_app_dev
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-only-secret-change-me-0123456789abcdef}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
       TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-}
