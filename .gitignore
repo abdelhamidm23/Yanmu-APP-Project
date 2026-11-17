@@ -12,3 +12,6 @@ test-results/
 blob-report/
 coverage/
 .DS_Store
+
+# Written by `next dev`; project rules live in CLAUDE.md
+AGENTS.md

@@ -8,4 +8,4 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 EXPOSE 3000
-CMD ["sh", "-c", "pnpm db:migrate && pnpm seed:dev-users && pnpm dev"]
+CMD ["sh", "-c", "pnpm db:setup && pnpm seed:dev-users && pnpm dev"]

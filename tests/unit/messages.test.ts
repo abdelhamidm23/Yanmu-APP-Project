@@ -24,6 +24,20 @@ describe("Arabic and English messages", () => {
     for (const [k, v] of Object.entries({ ...arFlat, ...enFlat })) expect(v.trim(), k).not.toBe("");
   });
 
+  it("never put a dot inside a key (next-intl reads dots as nesting)", () => {
+    for (const k of Object.keys(enFlat)) expect(k.split(".").every((part) => part.length > 0), k).toBe(true);
+    const keysWithDots = (tree: Tree): string[] =>
+      Object.entries(tree).flatMap(([k, v]) => [...(k.includes(".") ? [k] : []), ...(typeof v === "string" ? [] : keysWithDots(v))]);
+    expect([...keysWithDots(en as Tree), ...keysWithDots(ar as Tree)]).toEqual([]);
+  });
+
+  it("name every threshold, audited table and role", async () => {
+    const { SETTINGS } = await import("@/lib/settings");
+    const { AUDITED_TABLES } = await import("@/db/audit-tables");
+    for (const s of SETTINGS) expect(enFlat[`settings.values.keys.${s.key}`], s.key).toBeTruthy();
+    for (const t of AUDITED_TABLES) expect(enFlat[`settings.audit.tables.${t}`], t).toBeTruthy();
+  });
+
   it("cover every role and nav section", () => {
     for (const r of ROLES) expect(enFlat[`roles.${r}`]).toBeTruthy();
     for (const s of SECTIONS) {

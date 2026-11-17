@@ -53,3 +53,28 @@ export function formatDateTime(date: Date, locale: Locale, digits: Digits): stri
     minute: "2-digit",
   }).format(date);
 }
+
+/** A plain calendar date ("2026-11-20") shown in the user's language, e.g. "Fri 20 Nov 2026". */
+export function formatPlainDate(isoDate: string, locale: Locale, digits: Digits): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  return new Intl.DateTimeFormat(intlLocale(locale, digits), {
+    timeZone: "UTC",
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+
+/** A moment shown in Cairo time with date and time, e.g. "20 Nov 2026, 14:05". */
+export function formatTimestamp(date: Date, locale: Locale, digits: Digits): string {
+  return new Intl.DateTimeFormat(intlLocale(locale, digits), {
+    timeZone: DISPLAY_TIME_ZONE,
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+}

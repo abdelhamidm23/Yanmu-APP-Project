@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { requireSection } from "@/lib/require-user";
+import { canOpenSettings } from "@/lib/permissions";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Button, buttonClasses } from "@/components/ui/Button";
@@ -55,6 +56,17 @@ export default async function MorePage({
           </div>
         </dl>
       </Card>
+
+      {canOpenSettings(user) ? (
+        <Link
+          href="/settings"
+          data-testid="open-settings"
+          className="flex min-h-11 flex-col gap-1 rounded-card border border-border bg-surface p-4 hover:bg-bg"
+        >
+          <span className="text-section-title font-semibold">{t("settings.title")}</span>
+          <span className="text-[14px] text-muted">{t("settings.moreLink")}</span>
+        </Link>
+      ) : null}
 
       <Card>
         <form action={savePreferences} className="flex flex-col gap-4">

@@ -7,7 +7,10 @@ A phone-first web app for the Walid Ibrahim Group's two Yanmu nursery branches: 
 
 ## Status
 
-**Phase 0 (setup)** — sign-in with two-step verification, Arabic/English with right-to-left layout, design system, and the bottom navigation for every role. The screens behind each tab are placeholders that say which phase fills them in.
+- **Phase 0 (setup)** — sign-in with two-step verification, Arabic/English with right-to-left layout, design system, and the bottom navigation for every role.
+- **Phase 1 (foundation)** — branches, rooms, age bands, the working-day calendar and holidays, users and their roles per branch, adjustable thresholds, and the audit log. Open **More → Settings**. The database itself stops anyone from seeing or changing another branch's data, and every change is recorded.
+
+The other tabs are placeholders that say which phase fills them in.
 
 ## Try it on your computer and phone
 
@@ -29,12 +32,15 @@ You need **Docker Desktop** (free): https://www.docker.com/products/docker-deskt
 | --- | --- | --- |
 | `owner@yanmu.test` | Owner | Asks you to set up two-step sign-in first |
 | `company.manager@yanmu.test` | Company manager | Two-step sign-in |
-| `branch.manager@yanmu.test` | Branch manager | |
+| `branch.manager@yanmu.test` | Branch manager, Branch A | Can add holidays for Branch A only |
+| `branch.manager.b@yanmu.test` | Branch manager, Branch B | Sees only Branch B |
 | `accountant@yanmu.test` | Accountant | Two-step sign-in |
 | `hr@yanmu.test` | HR | Two-step sign-in |
-| `front.desk@yanmu.test` | Front desk | |
-| `teacher@yanmu.test` | Teacher | |
-| `multi.role@yanmu.test` | Front desk + Teacher | Shows the role switch in More |
+| `front.desk@yanmu.test` | Front desk, Branch A | |
+| `teacher@yanmu.test` | Teacher, Branch A | |
+| `multi.role@yanmu.test` | Front desk + Teacher, Branch B | Shows the role switch in More |
+
+Settings (users, rooms, thresholds, audit log) are open to the owner and company manager. Branch managers see the calendar for their own branch.
 
 For two-step sign-in, install **Google Authenticator** or **Microsoft Authenticator** on your phone and scan the square code the app shows.
 
@@ -66,9 +72,11 @@ Requires Node 22, pnpm 10 and PostgreSQL 16 (or use Docker for the database only
 ```bash
 cp .env.example .env
 pnpm install
-pnpm db:migrate
+pnpm db:setup          # migrations + organization, branches, age bands, settings
 pnpm seed:dev-users
 pnpm dev
 ```
 
-Checks: `pnpm lint`, `pnpm lint:rtl`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`. CI runs all of them on every pull request.
+Checks: `pnpm lint`, `pnpm lint:rtl`, `pnpm typecheck`, `pnpm test`, `pnpm test:db` (branch isolation and audit, needs the database), `pnpm test:e2e`. CI runs all of them on every pull request.
+
+The app connects as `yanmu_app`, a database role bound by row-level security. Migrations and seed scripts use the owner (`MIGRATION_DATABASE_URL`). See `.env.example`.

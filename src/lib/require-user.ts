@@ -2,6 +2,7 @@ import "server-only";
 import { notFound } from "next/navigation";
 import { redirect } from "@/i18n/navigation";
 import { canOpenSection, type Role, type Section } from "./roles";
+import { canOpenSettings, isOrgAdmin } from "./permissions";
 import { getCurrentUser, type CurrentUser } from "./session";
 
 /**
@@ -21,4 +22,12 @@ export async function requireSection(locale: string, section: Section | string):
   if (section === "more") return user as CurrentUser & { activeRole: Role };
   if (!user.activeRole || !canOpenSection(user.activeRole, section)) notFound();
   return user as CurrentUser & { activeRole: Role };
+}
+
+/** Settings screens. "admin" = owner or company manager; "calendar" also lets branch managers in. */
+export async function requireSettings(locale: string, level: "admin" | "calendar" = "admin"): Promise<CurrentUser> {
+  const user = await requireUser(locale);
+  const allowed = level === "admin" ? isOrgAdmin(user) : canOpenSettings(user);
+  if (!allowed) notFound();
+  return user;
 }
