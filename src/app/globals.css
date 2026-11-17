@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens — docs/SPEC.md §12. Colour is for status only.
+ * No gold, no gradients, no shadows beyond a 1px border.
+ * Layout uses logical properties only (ms-/me-/ps-/pe-/start/end): CLAUDE.md rule 8,
+ * checked by `pnpm lint:rtl`.
+ */
+@theme {
+  --color-bg: #f6f5f2;
+  --color-surface: #ffffff;
+  --color-border: #e6e3dd;
+  --color-divider: #efede8;
+  --color-segment-bg: #eae8e3;
+  --color-ink: #1a2230;
+  --color-muted: #5b6472;
+  --color-subtle: #4a5361;
+  --color-outline: #c9cfd8;
+  --color-brand: #1f3a5f;
+  --color-brand-hover: #152a47;
+  --color-brand-on-dark: #c9d4e3;
+  --color-brand-tint: #e9eef5;
+  --color-good: #0f766e;
+  --color-verified-bg: #e3f1ee;
+  --color-verified-fg: #0f5e57;
+  --color-attention: #b3401f;
+  --color-attention-bg: #fbebe5;
+  --color-attention-border: #e3a48c;
+  --color-critical: #a61b1b;
+  --color-critical-bg: #fbe7e7;
+  --color-provisional-bg: #edeff2;
+  --color-incomplete-bg: #e6ecf5;
+  --color-incomplete-fg: #2f4a6e;
+  --color-chart-neutral: #8fa3bf;
+
+  --font-sans: "IBM Plex Sans", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-arabic: "IBM Plex Sans Arabic", "IBM Plex Sans", system-ui, sans-serif;
+
+  /* Radius scale §12.3 */
+  --radius-card: 16px;
+  --radius-tile: 14px;
+  --radius-button: 12px;
+  --radius-segment: 9px;
+  --radius-chip: 6px;
+
+  /* Type scale §12.2 */
+  --text-page-title: 26px;
+  --text-page-title--line-height: 1.25;
+  --text-section-title: 17px;
+  --text-section-title--line-height: 1.35;
+  --text-row-title: 15px;
+  --text-row-title--line-height: 1.4;
+  --text-body: 14px;
+  --text-body--line-height: 1.55;
+  --text-meta: 12.5px;
+  --text-meta--line-height: 1.45;
+  --text-kpi: 26px;
+  --text-kpi--line-height: 1.15;
+  --text-nav: 11.5px;
+  --text-nav--line-height: 1.2;
+}
+
+html {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.5;
+  min-height: 100dvh;
+}
+
+html[lang="ar"] body {
+  font-family: var(--font-arabic);
+  line-height: 1.6;
+}
+
+/* All figures use tabular numbers (§12.2). */
+.figure,
+[data-figure] {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

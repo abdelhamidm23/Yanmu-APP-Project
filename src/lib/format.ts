@@ -1,0 +1,55 @@
+/**
+ * Number, money and date formatting.
+ * Money is always integer piastres (EGP × 100) as bigint — never floats (CLAUDE.md rule 5).
+ * Times are stored in UTC and shown in Africa/Cairo (rule 11).
+ */
+export type Locale = "ar" | "en";
+export type Digits = "arabic" | "latin";
+
+export const DISPLAY_TIME_ZONE = "Africa/Cairo";
+
+function intlLocale(locale: Locale, digits: Digits): string {
+  const base = locale === "ar" ? "ar-EG" : "en-EG";
+  return `${base}-u-nu-${digits === "arabic" ? "arab" : "latn"}`;
+}
+
+export function formatNumber(value: number | bigint, locale: Locale, digits: Digits): string {
+  return new Intl.NumberFormat(intlLocale(locale, digits), { maximumFractionDigits: 0 }).format(value);
+}
+
+/** Converts a user-typed EGP amount (string) to piastres without floating point. */
+export function parseEgpToPiastres(input: string): bigint {
+  const cleaned = input.trim().replace(/[,\s]/g, "");
+  const match = /^(-)?(\d+)(?:\.(\d{1,2}))?$/.exec(cleaned);
+  if (!match) throw new Error(`Not a valid EGP amount: "${input}"`);
+  const [, sign, pounds, fraction = ""] = match;
+  const piastres = BigInt(pounds) * 100n + BigInt(fraction.padEnd(2, "0"));
+  return sign ? -piastres : piastres;
+}
+
+/** Formats piastres as EGP, e.g. 1234550n → "12,345.50". The "EGP" unit is shown separately in the UI. */
+export function formatPiastres(piastres: bigint, locale: Locale, digits: Digits): string {
+  const negative = piastres < 0n;
+  const abs = negative ? -piastres : piastres;
+  const pounds = abs / 100n;
+  const rest = abs % 100n;
+  const nf = new Intl.NumberFormat(intlLocale(locale, digits), { useGrouping: true });
+  const fractionDigits = new Intl.NumberFormat(intlLocale(locale, digits), {
+    minimumIntegerDigits: 2,
+    useGrouping: false,
+  }).format(Number(rest));
+  const decimalSeparator = locale === "ar" && digits === "arabic" ? "٫" : ".";
+  const body = rest === 0n ? nf.format(pounds) : `${nf.format(pounds)}${decimalSeparator}${fractionDigits}`;
+  return negative ? `−${body}` : body;
+}
+
+export function formatDateTime(date: Date, locale: Locale, digits: Digits): string {
+  return new Intl.DateTimeFormat(intlLocale(locale, digits), {
+    timeZone: DISPLAY_TIME_ZONE,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
