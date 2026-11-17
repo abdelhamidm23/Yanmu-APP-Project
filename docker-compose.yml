@@ -1,0 +1,45 @@
+# Development environment: `docker compose up`, then open http://localhost:3000
+# Postgres runs here only for development; production uses a managed database in Egypt (spec §15).
+name: yanmu
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: yanmu
+      POSTGRES_PASSWORD: yanmu
+      POSTGRES_DB: yanmu
+      TZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yanmu -d yanmu"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://yanmu:yanmu@db:5432/yanmu
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-only-secret-change-me-0123456789abcdef}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      TRUSTED_ORIGINS: ${TRUSTED_ORIGINS:-}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      DEV_USER_PASSWORD: ${DEV_USER_PASSWORD:-Yanmu-dev-2026!}
+      WATCHPACK_POLLING: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src:/app/src
+      - ./drizzle:/app/drizzle
+      - ./public:/app/public
+
+volumes:
+  pgdata:

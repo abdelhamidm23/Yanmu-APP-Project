@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: yanmu
+          POSTGRES_PASSWORD: yanmu
+          POSTGRES_DB: yanmu
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U yanmu -d yanmu"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      CI: "true"
+      DATABASE_URL: postgres://yanmu:yanmu@localhost:5432/yanmu
+      BETTER_AUTH_SECRET: ci-only-secret-0123456789abcdefghijklmnop
+      BETTER_AUTH_URL: http://localhost:3000
+      DEV_USER_PASSWORD: Yanmu-ci-2026!
+      AUTH_RATE_LIMIT: "off"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: RTL check (no physical left/right)
+        run: pnpm lint:rtl
+      - name: Type check
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test
+      - name: Migrations are up to date with the schema
+        run: pnpm db:generate && git diff --exit-code -- drizzle
+      - name: Apply migrations
+        run: pnpm db:migrate
+      - name: Build
+        run: pnpm build
+      - name: Install browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: End-to-end tests (phone + desktop, Arabic + English)
+        run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
