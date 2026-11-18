@@ -1,5 +1,5 @@
 /**
- * Start command for the online demo (render.yaml). Not used in development or production.
+ * Start command for the online demo (deploy/huggingface, render.yaml). Not used in development or production.
  *
  * 1. Takes the database owner's connection string (MIGRATION_DATABASE_URL, pasted once when
  *    the preview is created) and derives the app's own login (yanmu_app) from it.

@@ -14,14 +14,16 @@ The other tabs are placeholders that say which phase fills them in.
 
 ## Online demo
 
-A demo with made-up data runs on Render's free plan, using a free Neon database. It needs no card. The setup file is [`render.yaml`](render.yaml), and it updates itself whenever the `preview` branch changes.
+A demo with made-up data runs as a free **Hugging Face Space**. It needs no card and no separate database: the container holds its own Postgres, and that database starts empty on every restart.
 
 - The sign-in screen lists one demo account per role. Tap one to sign in. The password for all of them is shown there too.
-- Demo accounts are reset every time the demo starts. The demo goes to sleep after 15 minutes without visitors, and the first visit after that takes about a minute.
 - Two-step sign-in is offered but not forced in the demo, so every role can be opened without an authenticator app.
-- **Never enter real children, families or staff in the demo.** Its database is in Frankfurt, not Egypt (rule 10).
+- The Space sleeps after two days without visitors, and the first visit after that takes a few minutes.
+- **Never enter real children, families or staff in the demo.** It is not hosted in Egypt (rule 10).
 
-To set it up from scratch: create a free Neon project (region: Frankfurt) and copy its connection string. Then open https://render.com/deploy?repo=https://github.com/abdelhamidm23/Yanmu-APP-Project/tree/preview, paste the string into `MIGRATION_DATABASE_URL`, and press **Deploy**.
+To set it up: create a free account at huggingface.co, then make a new Space (SDK **Docker**, template **Blank**, hardware **CPU basic**, visibility **Public**). Add a file named `Dockerfile` with the contents of [`deploy/huggingface/Dockerfile`](deploy/huggingface/Dockerfile). Open the app at `https://<user>-<space>.hf.space`, not on the huggingface.co page, which shows it inside a frame. To load newer code from the `preview` branch, press **Settings → Factory rebuild** in the Space.
+
+[`render.yaml`](render.yaml) does the same on Render (app) with Neon (database) for accounts that already have a card on Render.
 
 ## Try it on your computer and phone
 
