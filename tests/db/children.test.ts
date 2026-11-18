@@ -338,7 +338,10 @@ describe("transfer between branches (spec §8.1)", () => {
       await tx`select set_config('app.user_id', ${users.branch_managerA}, true)`;
       await expectError(tx, (sp) => sp`select app_decide_transfer(${req}, true, ${roomA}, ${today()}, null, null)`, denied);
 
+      // The receiving manager can see who is coming before deciding.
       await tx`select set_config('app.user_id', ${users.managerB}, true)`;
+      expect(await tx`select full_name_en from student where id = ${kidA.student}`).toEqual([{ full_name_en: "Child A" }]);
+      expect(await tx`select 1 from student_medical where student_id = ${kidA.student}`).toHaveLength(0);
       await tx`select app_decide_transfer(${req}, true, ${roomB}, ${today()}, 'Welcome', null)`;
       const enrollments = await tx`select branch_id, status from enrollment where student_id = ${kidA.student} order by created_at`;
       expect(enrollments).toEqual([
@@ -388,6 +391,32 @@ describe("spreadsheet import rollback (rule 13)", () => {
       expect((await tx`delete from family where id = ${f.id}`).count).toBe(1);
       // Rows typed in by hand are never removed by a rollback.
       expect((await tx`delete from family where id = ${kidB.family}`).count).toBe(0);
+    });
+  });
+
+  it("one-step rollback removes everything the batch added, and only for the importer", async () => {
+    await as(users.companyOrg, async (tx) => {
+      const [b] = await tx`insert into import_batch (branch_id, kind, file_name, row_count) values (${branchA}, 'children', 'kids.xlsx', 1) returning id`;
+      const [f] = await tx`insert into family (branch_id, account_no, display_name, import_batch_id) values (${branchA}, ${`${run}-rb`}, 'Imported', ${b.id}) returning id`;
+      const [g] = await tx`insert into guardian (family_id, branch_id, full_name, relationship, phone, import_batch_id) values (${f.id}, ${branchA}, 'Mona', 'mother', '01012345678', ${b.id}) returning id`;
+      const [s] = await tx`insert into student (branch_id, student_no, full_name_ar, full_name_en, date_of_birth, gender, family_id, import_batch_id)
+                           values (${branchA}, ${`${run}-rb1`}, 'x', 'Imported kid', ${monthsAgo(20)}, 'male', ${f.id}, ${b.id}) returning id`;
+      await tx`insert into student_guardian (student_id, guardian_id, branch_id) values (${s.id}, ${g.id}, ${branchA})`;
+      await tx`insert into consent_record (student_id, guardian_id, branch_id, purpose, granted_on) values (${s.id}, ${g.id}, ${branchA}, 'records', ${monthsAgo(3)})`;
+      await tx`insert into enrollment (student_id, branch_id, room_id, start_date, status, import_batch_id) values (${s.id}, ${branchA}, ${roomA}, ${monthsAgo(2)}, 'active', ${b.id})`;
+
+      await tx`select set_config('app.user_id', ${users.front_deskA}, true)`;
+      await expectError(tx, (sp) => sp`select app_rollback_import(${b.id})`, denied);
+
+      await tx`select set_config('app.user_id', ${users.companyOrg}, true)`;
+      const [{ n }] = await tx`select app_rollback_import(${b.id}) as n`;
+      expect(n).toBe(1);
+      expect(await tx`select 1 from student where id = ${s.id}`).toHaveLength(0);
+      expect(await tx`select 1 from family where id = ${f.id}`).toHaveLength(0);
+      expect(await tx`select 1 from enrollment where student_id = ${s.id}`).toHaveLength(0);
+      const [batch] = await tx`select status from import_batch where id = ${b.id}`;
+      expect(batch.status).toBe("rolled_back");
+      await expectError(tx, (sp) => sp`select app_rollback_import(${b.id})`, { message: "not_pending" });
     });
   });
 

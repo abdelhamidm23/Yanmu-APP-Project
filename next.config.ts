@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // The floating Next.js dev badge covers the bottom navigation on phones.
   devIndicators: false,
+  // Photos and signed consent scans are up to 5 MB each (spec §8.1); a form may carry a few.
+  experimental: { serverActions: { bodySizeLimit: "24mb" } },
   async headers() {
     return [
       {

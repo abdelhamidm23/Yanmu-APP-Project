@@ -1,11 +1,13 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 import { z } from "zod";
 import { withUserDb } from "@/db/rls";
 import { AUDITED_TABLES, auditNames, readAudit } from "@/db/audit";
-import { ageBand, appUser, branch, room, userBranchRole } from "@/db/schema";
+import { ageBand, appUser, branch, room, userBranchRole, waitlistEntry } from "@/db/schema";
+import { childList } from "@/db/children";
 import { getCurrentUser } from "@/lib/session";
-import { isOrgAdmin } from "@/lib/permissions";
+import { canViewChildren, canViewWaitlist, isOrgAdmin } from "@/lib/permissions";
+import { ageInMonths } from "@/lib/children";
 import { localName } from "@/lib/i18n-names";
 import { auditChanges } from "@/lib/audit-diff";
 import { auditFormatter } from "@/lib/audit-format";
@@ -21,9 +23,66 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
   const url = new URL(req.url);
   const locale = url.searchParams.get("locale") === "en" ? "en" : "ar";
   const user = await getCurrentUser();
-  if (!user || user.mustSetUpMfa || !isOrgAdmin(user)) return notFound();
+  if (!user || user.mustSetUpMfa) return notFound();
   const t = await getTranslations({ locale });
   const stamp = todayInCairo();
+
+  // Children and waitlist: everyone who can open those screens; row-level security limits the rows.
+  if (list === "children" || list === "waitlist") {
+    const branchId = z.uuid().safeParse(url.searchParams.get("branch"));
+    if (!branchId.success || !(list === "children" ? canViewChildren(user) : canViewWaitlist(user))) return notFound();
+    const data = await withUserDb(user.id, async (tx) => {
+      const [b] = await tx.select().from(branch).where(eq(branch.id, branchId.data));
+      if (!b) return null;
+      if (list === "children") return { b, children: await childList(tx, b.id, { show: url.searchParams.get("show") === "left" ? "left" : "current" }), waiting: [] };
+      const waiting = await tx
+        .select({ w: waitlistEntry, band: ageBand })
+        .from(waitlistEntry)
+        .leftJoin(ageBand, eq(ageBand.id, waitlistEntry.ageBandId))
+        .where(and(eq(waitlistEntry.branchId, b.id), eq(waitlistEntry.status, "waiting")))
+        .orderBy(asc(waitlistEntry.requestedStartMonth));
+      return { b, children: [], waiting };
+    });
+    if (!data) return notFound();
+    const age = (dob: string) => {
+      const m = ageInMonths(dob, stamp);
+      return t("children.age", { years: Math.floor(m / 12), months: m % 12 });
+    };
+    if (list === "children") {
+      const rows = data.children.map((c) => [
+        c.studentNo,
+        c.fullNameAr,
+        c.fullNameEn,
+        c.dateOfBirth,
+        age(c.dateOfBirth),
+        t(`children.gender.${c.gender as "female"}`),
+        (locale === "ar" ? c.roomNameAr : c.roomNameEn) ?? "",
+        c.startDate ?? "",
+        t(`children.status.${c.status as "active"}`),
+        c.hasRecordsConsent ? t("settings.common.yes") : t("settings.common.no"),
+        c.isDemo ? t("app.demoData") : "",
+      ]);
+      const cols = ["number", "nameAr", "nameEn", "dob", "ageLabel", "genderLabel", "room", "startLabel", "statusLabel", "consentLabel", "demoLabel"].map((k) => ({
+        header: t(`children.export.${k as "number"}`),
+        width: k.startsWith("name") ? 28 : 16,
+      }));
+      return xlsxResponse(await buildWorkbook(`${t("children.title")} ${data.b.code}`, cols, rows, locale), `children-${data.b.code}-${stamp}.xlsx`);
+    }
+    const rows = data.waiting.map(({ w, band }) => [
+      w.studentName,
+      w.dateOfBirth,
+      age(w.dateOfBirth),
+      band ? localName(band, locale) : "",
+      w.requestedStartMonth.slice(0, 7),
+      w.guardianName ?? "",
+      w.guardianPhone,
+      w.notes ?? "",
+    ]);
+    const cols = ["childName", "dob", "ageLabel", "band", "month", "guardianName", "phone", "notes"].map((k) => ({ header: t(`children.export.${k as "number"}`), width: 22 }));
+    return xlsxResponse(await buildWorkbook(t("children.waitlistPage.title"), cols, rows, locale), `waitlist-${data.b.code}-${stamp}.xlsx`);
+  }
+
+  if (!isOrgAdmin(user)) return notFound();
 
   if (list === "users") {
     const { users, grants, branches } = await withUserDb(user.id, async (tx) => ({

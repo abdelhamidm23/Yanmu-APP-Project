@@ -10,4 +10,17 @@ export const AUDITED_TABLES = [
   "setting",
   "user_branch_role",
   "app_user",
+  // Phase 2 (drizzle/0004)
+  "user_room",
+  "import_batch",
+  "attachment",
+  "family",
+  "guardian",
+  "student",
+  "student_guardian",
+  "student_medical",
+  "consent_record",
+  "approval_request",
+  "enrollment",
+  "waitlist_entry",
 ] as const;

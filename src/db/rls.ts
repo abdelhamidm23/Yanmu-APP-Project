@@ -37,3 +37,26 @@ function findPgCode(error: unknown): string | undefined {
   }
   return undefined;
 }
+
+/** Named refusals raised by the database rules (drizzle/0004): over_capacity, age_out_of_range, … */
+export const DB_RULE_CODES = [
+  "over_capacity",
+  "age_out_of_range",
+  "band_reason_required",
+  "not_pending",
+  "own_request",
+  "reason_required",
+  "changed_since_import",
+] as const;
+export type DbRuleCode = (typeof DB_RULE_CODES)[number];
+
+export function dbRuleCode(error: unknown): DbRuleCode | null {
+  let e: unknown = error;
+  for (let i = 0; i < 5 && e; i++) {
+    const message = (e as { message?: unknown }).message;
+    const hit = DB_RULE_CODES.find((c) => message === c);
+    if (hit) return hit;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return null;
+}

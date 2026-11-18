@@ -2,7 +2,7 @@ import "server-only";
 import { notFound } from "next/navigation";
 import { redirect } from "@/i18n/navigation";
 import { canOpenSection, type Role, type Section } from "./roles";
-import { canOpenSettings, isOrgAdmin } from "./permissions";
+import { canImportChildren, canOpenSettings, canSeeChildApprovals, canViewChildren, canViewWaitlist, isOrgAdmin } from "./permissions";
 import { getCurrentUser, type CurrentUser } from "./session";
 
 /**
@@ -28,6 +28,21 @@ export async function requireSection(locale: string, section: Section | string):
 export async function requireSettings(locale: string, level: "admin" | "calendar" = "admin"): Promise<CurrentUser> {
   const user = await requireUser(locale);
   const allowed = level === "admin" ? isOrgAdmin(user) : canOpenSettings(user);
+  if (!allowed) notFound();
+  return user;
+}
+
+/** Children screens (spec §5, §8.1). The database's row-level security narrows what each role sees. */
+export async function requireChildren(
+  locale: string,
+  area: "view" | "waitlist" | "approvals" | "import" = "view",
+): Promise<CurrentUser & { activeRole: Role | null }> {
+  const user = await requireUser(locale);
+  const allowed =
+    area === "view" ? canViewChildren(user)
+    : area === "waitlist" ? canViewWaitlist(user)
+    : area === "approvals" ? canSeeChildApprovals(user)
+    : canImportChildren(user);
   if (!allowed) notFound();
   return user;
 }

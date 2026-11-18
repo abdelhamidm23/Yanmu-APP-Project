@@ -66,6 +66,28 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
 $$;
 --> statement-breakpoint
 
+-- Names of all active branches, for choosing where a child transfers to and for showing where a
+-- request came from. Names and codes only; anyone signed in with a role may read them.
+CREATE OR REPLACE FUNCTION app_branch_directory() RETURNS TABLE (id uuid, name_ar text, name_en text, code text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT b.id, b.name_ar, b.name_en, b.code FROM branch b
+  WHERE b.is_active AND EXISTS (SELECT 1 FROM app_active_roles())
+  ORDER BY b.code
+$$;
+--> statement-breakpoint
+
+-- A branch manager (or owner / company manager) of the receiving branch sees the child named in a
+-- pending transfer request, so they can decide on it.
+CREATE OR REPLACE FUNCTION app_transfer_incoming(p_student uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM approval_request a
+    WHERE a.student_id = p_student AND a.type = 'transfer' AND a.status = 'pending'
+      AND app_has_role_in(a.to_branch_id, ARRAY['owner', 'company_manager', 'branch_manager']::app_role[])
+  )
+$$;
+--> statement-breakpoint
+
 -- Child's age in whole months on a date.
 CREATE OR REPLACE FUNCTION app_age_months(p_dob date, p_on date) RETURNS integer
 LANGUAGE sql IMMUTABLE AS $$
@@ -236,7 +258,8 @@ BEGIN
       (SELECT e2.status FROM enrollment e2
        WHERE e2.student_id = NEW.student_id AND e2.status IN ('withdrawn', 'graduated')
        ORDER BY e2.end_date DESC NULLS FIRST, e2.updated_at DESC LIMIT 1),
-      'pending')
+      -- The owner declined the place: the child did not join.
+      CASE WHEN bool_or(e.status = 'declined') THEN 'withdrawn' ELSE 'pending' END)
   END INTO v_status
   FROM enrollment e WHERE e.student_id = NEW.student_id;
   UPDATE student SET status = v_status WHERE id = NEW.student_id AND status IS DISTINCT FROM v_status;
@@ -364,6 +387,46 @@ END
 $$;
 --> statement-breakpoint
 
+-- Undo a spreadsheet import in one step (rule 13). Refused if any of its children has changed
+-- branch, been enrolled again by hand, or gained a brother or sister added by hand since.
+CREATE OR REPLACE FUNCTION app_rollback_import(p_batch uuid) RETURNS integer
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_batch import_batch%ROWTYPE;
+  v_count integer;
+BEGIN
+  SELECT * INTO v_batch FROM import_batch WHERE id = p_batch FOR UPDATE;
+  IF v_batch.id IS NULL OR v_batch.status <> 'committed' THEN RAISE EXCEPTION 'not_pending' USING ERRCODE = '23514'; END IF;
+  IF NOT app_child_importer(v_batch.branch_id) THEN RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501'; END IF;
+
+  IF EXISTS (SELECT 1 FROM student s WHERE s.import_batch_id = p_batch AND s.branch_id <> v_batch.branch_id)
+     OR EXISTS (SELECT 1 FROM enrollment e JOIN student s ON s.id = e.student_id
+                WHERE s.import_batch_id = p_batch AND e.import_batch_id IS DISTINCT FROM p_batch)
+     OR EXISTS (SELECT 1 FROM student s JOIN family f ON f.id = s.family_id
+                WHERE f.import_batch_id = p_batch AND s.import_batch_id IS DISTINCT FROM p_batch) THEN
+    RAISE EXCEPTION 'changed_since_import' USING ERRCODE = '23514';
+  END IF;
+
+  SELECT count(*) INTO v_count FROM student WHERE import_batch_id = p_batch;
+  DELETE FROM consent_record WHERE student_id IN (SELECT id FROM student WHERE import_batch_id = p_batch);
+  DELETE FROM student_medical WHERE student_id IN (SELECT id FROM student WHERE import_batch_id = p_batch);
+  DELETE FROM student_guardian WHERE student_id IN (SELECT id FROM student WHERE import_batch_id = p_batch);
+  DELETE FROM approval_request WHERE student_id IN (SELECT id FROM student WHERE import_batch_id = p_batch);
+  UPDATE waitlist_entry SET converted_student_id = NULL, status = 'waiting'
+    WHERE converted_student_id IN (SELECT id FROM student WHERE import_batch_id = p_batch);
+  DELETE FROM enrollment WHERE import_batch_id = p_batch;
+  DELETE FROM student WHERE import_batch_id = p_batch;
+  DELETE FROM guardian WHERE import_batch_id = p_batch
+    AND NOT EXISTS (SELECT 1 FROM student_guardian sg WHERE sg.guardian_id = guardian.id);
+  DELETE FROM family WHERE import_batch_id = p_batch
+    AND NOT EXISTS (SELECT 1 FROM student s WHERE s.family_id = family.id)
+    AND NOT EXISTS (SELECT 1 FROM guardian g WHERE g.family_id = family.id);
+  UPDATE import_batch SET status = 'rolled_back', rolled_back_at = now() WHERE id = p_batch;
+  RETURN v_count;
+END
+$$;
+--> statement-breakpoint
+
 -- Owner or company manager reads a child's medical notes after typing a reason (spec §5 "break-glass").
 -- Every use is written to the audit log.
 CREATE OR REPLACE FUNCTION app_break_glass_medical(p_student uuid, p_reason text)
@@ -481,9 +544,9 @@ GRANT SELECT, INSERT, UPDATE ON user_room, import_batch, attachment, family, gua
 --> statement-breakpoint
 GRANT DELETE ON user_room, family, guardian, student, student_guardian, enrollment TO yanmu_app;
 --> statement-breakpoint
-GRANT EXECUTE ON FUNCTION app_next_student_no(uuid), app_next_family_no(uuid), app_age_months(date, date),
+GRANT EXECUTE ON FUNCTION app_branch_directory(), app_next_student_no(uuid), app_next_family_no(uuid), app_age_months(date, date),
   app_decide_over_capacity(uuid, boolean, text), app_decide_transfer(uuid, boolean, uuid, date, text, text),
-  app_break_glass_medical(uuid, text) TO yanmu_app;
+  app_break_glass_medical(uuid, text), app_rollback_import(uuid) TO yanmu_app;
 --> statement-breakpoint
 
 -- ---------------------------------------------------------------------------
@@ -545,7 +608,7 @@ CREATE POLICY guardian_delete ON guardian FOR DELETE TO yanmu_app
 --> statement-breakpoint
 
 CREATE POLICY student_read ON student FOR SELECT TO yanmu_app
-  USING (app_child_viewer(branch_id) OR app_teacher_sees_student(id));
+  USING (app_child_viewer(branch_id) OR app_teacher_sees_student(id) OR app_transfer_incoming(id));
 --> statement-breakpoint
 CREATE POLICY student_insert ON student FOR INSERT TO yanmu_app
   WITH CHECK (app_child_writer(branch_id) OR (import_batch_id IS NOT NULL AND app_child_importer(branch_id)));
