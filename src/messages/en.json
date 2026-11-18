@@ -40,7 +40,10 @@
     "backupCode": "Backup code",
     "useAppCode": "Use the app code instead",
     "backToSignIn": "Back to sign in",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "demoTitle": "Demo accounts",
+    "demoIntro": "This is a preview with made-up data. Tap a role to sign in as that person. Password for all:",
+    "demoBranch": "(Branch {code})"
   },
   "mfa": {
     "setupTitle": "Turn on two-step sign-in",

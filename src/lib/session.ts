@@ -6,6 +6,7 @@ import { userBranchRole } from "@/db/schema";
 import { withUserDb } from "@/db/rls";
 import { auth } from "./auth";
 import { isRole, primaryRole, requiresMfa, type Role } from "./roles";
+import { isDemoMode } from "./demo";
 
 export const ACTIVE_ROLE_COOKIE = "yanmu_active_role";
 
@@ -55,6 +56,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     roles,
     grants,
     activeRole,
-    mustSetUpMfa: requiresMfa(roles) && !mfaEnabled,
+    // In the online demo, two-step sign-in is offered (More → Security) but not forced,
+    // so anyone trying the preview can open every role without an authenticator app.
+    mustSetUpMfa: requiresMfa(roles) && !mfaEnabled && !isDemoMode(),
   };
 });

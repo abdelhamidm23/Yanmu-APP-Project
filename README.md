@@ -12,6 +12,17 @@ A phone-first web app for the Walid Ibrahim Group's two Yanmu nursery branches: 
 
 The other tabs are placeholders that say which phase fills them in.
 
+## Online demo
+
+A private-by-obscurity demo with made-up data runs on Render's free plan, using a free Neon database. It needs no card. The setup file is [`render.yaml`](render.yaml), and it updates itself whenever the `preview` branch changes.
+
+- The sign-in screen lists one demo account per role. Tap one to sign in. The password for all of them is shown there too.
+- Demo accounts are reset every time the demo starts. The demo goes to sleep after 15 minutes without visitors, and the first visit after that takes about a minute.
+- Two-step sign-in is offered but not forced in the demo, so every role can be opened without an authenticator app.
+- **Never enter real children, families or staff in the demo.** Its database is in Frankfurt, not Egypt (rule 10).
+
+To set it up from scratch: create a free Neon project (region: Frankfurt) and copy its connection string. Then open https://render.com/deploy?repo=https://github.com/abdelhamidm23/Yanmu-APP-Project/tree/preview, paste the string into `MIGRATION_DATABASE_URL`, and press **Deploy**.
+
 ## Try it on your computer and phone
 
 You need **Docker Desktop** (free): https://www.docker.com/products/docker-desktop/ — install it and open it once.

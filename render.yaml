@@ -1,0 +1,29 @@
+# Online demo of the Nursery Command Center on Render's free plan (no card needed).
+# Made-up data only: never enter real children, families or staff here (CLAUDE.md rule 10).
+# The database is a free Neon Postgres project; its connection string is pasted once at setup.
+services:
+  - type: web
+    name: yanmu-demo
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: preview
+    autoDeployTrigger: commit
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: node scripts/preview-start.mjs
+    healthCheckPath: /api/health
+    envVars:
+      - key: DEMO_MODE
+        value: "true"
+      - key: MIGRATION_DATABASE_URL
+        sync: false # asked for when the preview is created: the Neon connection string
+      - key: APP_DB_PASSWORD
+        generateValue: true
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: DEV_USER_PASSWORD
+        value: Yanmu-demo-2026!
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"

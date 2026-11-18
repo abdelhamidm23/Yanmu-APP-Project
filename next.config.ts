@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "same-origin" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Permissions-Policy", value: "camera=(self), geolocation=()" },
+          // The online demo must not show up in search engines.
+          ...(process.env.DEMO_MODE === "true" ? [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] : []),
         ],
       },
     ];
