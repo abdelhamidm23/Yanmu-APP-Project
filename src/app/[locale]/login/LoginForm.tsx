@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { authClient } from "@/lib/auth-client";
@@ -7,7 +7,13 @@ import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { Alert } from "@/components/ui/Alert";
 
-export function LoginForm() {
+export interface DemoLogins {
+  password: string;
+  accounts: { email: string; label: string }[];
+}
+
+export function LoginForm({ demo }: { demo?: DemoLogins }) {
+  const formRef = useRef<HTMLFormElement>(null);
   const t = useTranslations("auth");
   const router = useRouter();
   const locale = useLocale() as "ar" | "en";
@@ -44,8 +50,17 @@ export function LoginForm() {
     }
   }
 
+  function signInAs(email: string) {
+    const form = formRef.current;
+    if (!form || !demo) return;
+    (form.elements.namedItem("email") as HTMLInputElement).value = email;
+    (form.elements.namedItem("password") as HTMLInputElement).value = demo.password;
+    form.requestSubmit();
+  }
+
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+    <>
+    <form ref={formRef} onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
       <TextField id="email" name="email" type="email" label={t("email")} autoComplete="username" inputMode="email" dir="ltr" required />
       <TextField id="password" name="password" type="password" label={t("password")} autoComplete="current-password" dir="ltr" required />
       {error ? <Alert>{error}</Alert> : null}
@@ -53,5 +68,34 @@ export function LoginForm() {
         {busy ? t("signingIn") : t("signIn")}
       </Button>
     </form>
+    {demo ? (
+      <section className="mt-6 flex flex-col gap-2 border-t border-divider pt-4" data-testid="demo-accounts">
+        <h2 className="text-section-title font-semibold">{t("demoTitle")}</h2>
+        <p className="text-meta text-muted">
+          {t("demoIntro")}{" "}
+          <code dir="ltr" className="figure rounded-chip bg-bg px-1.5 py-0.5">
+            {demo.password}
+          </code>
+        </p>
+        <ul className="flex flex-col gap-1">
+          {demo.accounts.map((a) => (
+            <li key={a.email}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => signInAs(a.email)}
+                className="flex min-h-11 w-full flex-col items-start justify-center rounded-button px-3 py-1.5 text-start hover:bg-bg"
+              >
+                <span className="text-[15px] font-medium">{a.label}</span>
+                <span dir="ltr" className="text-meta text-muted">
+                  {a.email}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null}
+    </>
   );
 }

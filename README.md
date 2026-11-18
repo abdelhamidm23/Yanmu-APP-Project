@@ -12,6 +12,19 @@ A phone-first web app for the Walid Ibrahim Group's two Yanmu nursery branches: 
 
 The other tabs are placeholders that say which phase fills them in.
 
+## Online demo
+
+A demo with made-up data runs as a free **Hugging Face Space**. It needs no card and no separate database: the container holds its own Postgres, and that database starts empty on every restart.
+
+- The sign-in screen lists one demo account per role. Tap one to sign in. The password for all of them is shown there too.
+- Two-step sign-in is offered but not forced in the demo, so every role can be opened without an authenticator app.
+- The Space sleeps after two days without visitors, and the first visit after that takes a few minutes.
+- **Never enter real children, families or staff in the demo.** It is not hosted in Egypt (rule 10).
+
+To set it up: create a free account at huggingface.co, then make a new Space (SDK **Docker**, template **Blank**, hardware **CPU basic**, visibility **Public**). Add a file named `Dockerfile` with the contents of [`deploy/huggingface/Dockerfile`](deploy/huggingface/Dockerfile). Open the app at `https://<user>-<space>.hf.space`, not on the huggingface.co page, which shows it inside a frame. To load newer code from the `preview` branch, press **Settings → Factory rebuild** in the Space.
+
+[`render.yaml`](render.yaml) does the same on Render (app) with Neon (database) for accounts that already have a card on Render.
+
 ## Try it on your computer and phone
 
 You need **Docker Desktop** (free): https://www.docker.com/products/docker-desktop/ — install it and open it once.
