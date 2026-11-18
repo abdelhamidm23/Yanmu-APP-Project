@@ -9,6 +9,8 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
+  customType,
   date,
   index,
   integer,
@@ -19,6 +21,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -304,4 +307,295 @@ export const auditEvent = pgTable(
     reason: text("reason"),
   },
   (t) => [index("audit_event_at_idx").on(t.at), index("audit_event_table_row_idx").on(t.tableName, t.rowId)],
+);
+
+// ---------------------------------------------------------------------------
+// Spec §7.2 People (children side) and §7.3 Enrollment — Phase 2
+// Row policies, the branch-copy triggers and the capacity rule live in
+// drizzle/0004_phase2_children_rls.sql.
+// ---------------------------------------------------------------------------
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+
+/** Rooms a teacher looks after (spec §5 "room" scope). Phase 3's roster builds on this. */
+export const userRoom = pgTable(
+  "user_room",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => appUser.id, { onDelete: "cascade" }),
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => room.id),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    ...tracked,
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.roomId] }), index("user_room_room_idx").on(t.roomId)],
+);
+
+/** One upload of a spreadsheet (spec §8.11). Rows it created carry its id so the batch can be rolled back. */
+export const importBatch = pgTable(
+  "import_batch",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    kind: text("kind").notNull(),
+    fileName: text("file_name").notNull(),
+    rowCount: integer("row_count").notNull(),
+    status: text("status").notNull().default("committed"),
+    rolledBackAt: timestamp("rolled_back_at", { withTimezone: true }),
+    ...tracked,
+  },
+  (t) => [
+    index("import_batch_branch_idx").on(t.branchId),
+    check("import_batch_status_check", sql`${t.status} IN ('committed', 'rolled_back')`),
+  ],
+);
+
+/** Scanned forms and photos. Stored in the database so personal data stays on the Egyptian server. */
+export const attachment = pgTable(
+  "attachment",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    fileName: text("file_name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    data: bytea("data").notNull(),
+    ...tracked,
+  },
+  (t) => [index("attachment_branch_idx").on(t.branchId), check("attachment_size_check", sql`${t.sizeBytes} <= 5242880`)],
+);
+
+/** Billing account; siblings share one (spec §7.2). */
+export const family = pgTable(
+  "family",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    accountNo: text("account_no").notNull(),
+    displayName: text("display_name").notNull(),
+    notes: text("notes"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    importBatchId: uuid("import_batch_id").references(() => importBatch.id),
+    ...tracked,
+  },
+  (t) => [unique("family_account_no_unique").on(t.accountNo), index("family_branch_idx").on(t.branchId)],
+);
+
+export const guardian = pgTable(
+  "guardian",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    familyId: uuid("family_id")
+      .notNull()
+      .references(() => family.id),
+    /** Copied from the family by a trigger, for row-level security. */
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    fullName: text("full_name").notNull(),
+    relationship: text("relationship").notNull(),
+    phone: text("phone").notNull(),
+    nationalIdLast4: text("national_id_last4"),
+    photoAttachmentId: uuid("photo_attachment_id").references(() => attachment.id),
+    isDemo: boolean("is_demo").notNull().default(false),
+    importBatchId: uuid("import_batch_id").references(() => importBatch.id),
+    ...tracked,
+  },
+  (t) => [
+    index("guardian_family_idx").on(t.familyId),
+    index("guardian_phone_idx").on(t.phone),
+    check("guardian_nid_check", sql`${t.nationalIdLast4} IS NULL OR ${t.nationalIdLast4} ~ '^[0-9]{4}$'`),
+    check("guardian_relationship_check", sql`${t.relationship} IN ('mother', 'father', 'grandparent', 'sibling', 'relative', 'nanny', 'other')`),
+  ],
+);
+
+export const student = pgTable(
+  "student",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    /** Current branch. A transfer moves it; the student row is never duplicated (spec §7.3). */
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    studentNo: text("student_no").notNull(),
+    fullNameAr: text("full_name_ar").notNull(),
+    fullNameEn: text("full_name_en").notNull(),
+    dateOfBirth: date("date_of_birth").notNull(),
+    gender: text("gender").notNull(),
+    familyId: uuid("family_id")
+      .notNull()
+      .references(() => family.id),
+    photoAttachmentId: uuid("photo_attachment_id").references(() => attachment.id),
+    status: text("status").notNull().default("active"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    importBatchId: uuid("import_batch_id").references(() => importBatch.id),
+    ...tracked,
+  },
+  (t) => [
+    unique("student_no_unique").on(t.studentNo),
+    index("student_branch_idx").on(t.branchId),
+    index("student_family_idx").on(t.familyId),
+    check("student_gender_check", sql`${t.gender} IN ('female', 'male')`),
+    check("student_status_check", sql`${t.status} IN ('pending', 'active', 'withdrawn', 'graduated')`),
+  ],
+);
+
+export const studentGuardian = pgTable(
+  "student_guardian",
+  {
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => student.id, { onDelete: "cascade" }),
+    guardianId: uuid("guardian_id")
+      .notNull()
+      .references(() => guardian.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    canPickUp: boolean("can_pick_up").notNull().default(true),
+    isPrimaryContact: boolean("is_primary_contact").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [primaryKey({ columns: [t.studentId, t.guardianId] }), index("student_guardian_guardian_idx").on(t.guardianId)],
+);
+
+/** Restricted (spec §5): branch manager and the child's teachers; owner and company manager by break-glass only. */
+export const studentMedical = pgTable("student_medical", {
+  studentId: uuid("student_id")
+    .primaryKey()
+    .references(() => student.id, { onDelete: "cascade" }),
+  branchId: uuid("branch_id")
+    .notNull()
+    .references(() => branch.id),
+  allergies: text("allergies"),
+  conditions: text("conditions"),
+  medications: text("medications"),
+  doctorContact: text("doctor_contact"),
+  ...tracked,
+});
+
+export const consentRecord = pgTable(
+  "consent_record",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => student.id, { onDelete: "cascade" }),
+    guardianId: uuid("guardian_id").references(() => guardian.id),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    purpose: text("purpose").notNull(),
+    grantedOn: date("granted_on").notNull(),
+    withdrawnOn: date("withdrawn_on"),
+    formAttachmentId: uuid("form_attachment_id").references(() => attachment.id),
+    language: text("language").notNull().default("ar"),
+    ...tracked,
+  },
+  (t) => [
+    index("consent_record_student_idx").on(t.studentId),
+    check("consent_purpose_check", sql`${t.purpose} IN ('records', 'photos', 'medical', 'other')`),
+  ],
+);
+
+/** Approval requests (spec §7.3 over_capacity; transfers). Money approvals reuse this in Phase 4. */
+export const approvalRequest = pgTable(
+  "approval_request",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    type: text("type").notNull(),
+    status: text("status").notNull().default("pending"),
+    studentId: uuid("student_id").references(() => student.id, { onDelete: "cascade" }),
+    enrollmentId: uuid("enrollment_id"),
+    /** Transfers: where the child is going. */
+    toBranchId: uuid("to_branch_id").references(() => branch.id),
+    reason: text("reason"),
+    decidedBy: uuid("decided_by"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decisionNote: text("decision_note"),
+    ...tracked,
+  },
+  (t) => [
+    index("approval_request_branch_idx").on(t.branchId),
+    index("approval_request_to_branch_idx").on(t.toBranchId),
+    check("approval_type_check", sql`${t.type} IN ('over_capacity', 'transfer')`),
+    check("approval_status_check", sql`${t.status} IN ('pending', 'approved', 'declined', 'cancelled')`),
+  ],
+);
+
+export const enrollment = pgTable(
+  "enrollment",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => student.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => room.id),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date"),
+    status: text("status").notNull(),
+    endReason: text("end_reason"),
+    /** Required when the room's age band differs from the child's (spec §2.1). */
+    bandOverrideReason: text("band_override_reason"),
+    approvalRequestId: uuid("approval_request_id").references(() => approvalRequest.id),
+    /** Fee lists and price locks arrive in Phase 4. */
+    feeListId: uuid("fee_list_id"),
+    priceLockId: uuid("price_lock_id"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    importBatchId: uuid("import_batch_id").references(() => importBatch.id),
+    ...tracked,
+  },
+  (t) => [
+    index("enrollment_branch_status_idx").on(t.branchId, t.status),
+    index("enrollment_student_idx").on(t.studentId),
+    index("enrollment_room_idx").on(t.roomId),
+    uniqueIndex("enrollment_one_open_per_student").on(t.studentId).where(sql`${t.status} IN ('pending_approval', 'active')`),
+    check(
+      "enrollment_status_check",
+      sql`${t.status} IN ('pending_approval', 'active', 'withdrawn', 'graduated', 'transferred', 'declined')`,
+    ),
+  ],
+);
+
+export const waitlistEntry = pgTable(
+  "waitlist_entry",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    studentName: text("student_name").notNull(),
+    dateOfBirth: date("date_of_birth").notNull(),
+    guardianName: text("guardian_name"),
+    guardianPhone: text("guardian_phone").notNull(),
+    requestedStartMonth: date("requested_start_month").notNull(),
+    ageBandId: uuid("age_band_id").references(() => ageBand.id),
+    status: text("status").notNull().default("waiting"),
+    notes: text("notes"),
+    convertedStudentId: uuid("converted_student_id").references(() => student.id),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    index("waitlist_branch_status_idx").on(t.branchId, t.status),
+    check("waitlist_status_check", sql`${t.status} IN ('waiting', 'converted', 'cancelled')`),
+  ],
 );

@@ -22,6 +22,20 @@
       "when": 1794926706668,
       "tag": "0002_phase1_rls_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795016239494,
+      "tag": "0003_phase2_children",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795016244633,
+      "tag": "0004_phase2_children_rls",
+      "breakpoints": true
     }
   ]
 }
