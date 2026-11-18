@@ -17,6 +17,7 @@ if (process.env.DEMO_MODE !== "true") {
 function clean(raw) {
   const u = new URL(raw);
   u.searchParams.delete("channel_binding"); // not understood by the Postgres client
+  u.hostname = u.hostname.replace("-pooler.", "."); // Neon: use the direct connection, not the pooler
   if (!u.searchParams.has("sslmode")) u.searchParams.set("sslmode", "require");
   return u;
 }

@@ -14,7 +14,7 @@ The other tabs are placeholders that say which phase fills them in.
 
 ## Online demo
 
-A private-by-obscurity demo with made-up data runs on Render's free plan, using a free Neon database. It needs no card. The setup file is [`render.yaml`](render.yaml), and it updates itself whenever the `preview` branch changes.
+A demo with made-up data runs on Render's free plan, using a free Neon database. It needs no card. The setup file is [`render.yaml`](render.yaml), and it updates itself whenever the `preview` branch changes.
 
 - The sign-in screen lists one demo account per role. Tap one to sign in. The password for all of them is shown there too.
 - Demo accounts are reset every time the demo starts. The demo goes to sleep after 15 minutes without visitors, and the first visit after that takes about a minute.
