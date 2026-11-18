@@ -2,7 +2,9 @@ import "server-only";
 import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { eq } from "drizzle-orm";
-import { userBranchRole } from "@/db/schema";
+import { authSession, userBranchRole } from "@/db/schema";
+import { db } from "@/db";
+import { SHARED_IDLE_MINUTES } from "./pin";
 import { withUserDb } from "@/db/rls";
 import { auth } from "./auth";
 import { isRole, primaryRole, requiresMfa, type Role } from "./roles";
@@ -22,6 +24,8 @@ export interface CurrentUser {
   grants: { role: Role; branchId: string | null }[];
   activeRole: Role | null;
   mustSetUpMfa: boolean;
+  /** Signed in with a PIN on a shared class phone. */
+  sharedDevice: boolean;
 }
 
 /** Reads the session and roles from the database. Cached per request. */
@@ -29,6 +33,17 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return null;
   const u = session.user;
+
+  // Spec §14: a PIN sign-in on a shared class phone ends after 30 minutes without use.
+  const s = session.session as typeof session.session & { sharedDevice?: boolean | null; lastActiveAt?: Date | string | null };
+  if (s.sharedDevice) {
+    const last = s.lastActiveAt ? new Date(s.lastActiveAt).getTime() : 0;
+    if (Date.now() - last > SHARED_IDLE_MINUTES * 60_000) {
+      await db.delete(authSession).where(eq(authSession.token, s.token));
+      return null;
+    }
+    if (Date.now() - last > 60_000) await db.update(authSession).set({ lastActiveAt: new Date() }).where(eq(authSession.token, s.token));
+  }
 
   // Spec §5: access ends at 00:00 on the user's end date.
   const endDate = u.endDate ? new Date(u.endDate) : null;
@@ -59,5 +74,6 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     // In the online demo, two-step sign-in is offered (More → Security) but not forced,
     // so anyone trying the preview can open every role without an authenticator app.
     mustSetUpMfa: requiresMfa(roles) && !mfaEnabled && !isDemoMode(),
+    sharedDevice: Boolean(s.sharedDevice),
   };
 });

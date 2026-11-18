@@ -8,6 +8,9 @@ export const isDemoMode = () => process.env.DEMO_MODE === "true";
 
 type Grant = [Role, "A" | "B" | null]; // null = organization-wide
 
+/** Branch names as seeded (scripts/seed-base.ts), for the sign-in screen's test account list. */
+export const DEMO_BRANCH_NAMES = { A: { ar: "يانمو", en: "Yanmu" }, B: { ar: "نورفال", en: "Norvale" } } as const;
+
 /** One test account per role. Used by the seed script and listed on the sign-in screen in demo mode. */
 export const DEMO_ACCOUNTS: { email: string; name: string; locale: "ar" | "en"; roles: Grant[] }[] = [
   { email: "owner@yanmu.test", name: "Owner (test)", locale: "ar", roles: [["owner", null]] },

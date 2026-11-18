@@ -57,7 +57,7 @@ describe("Arabic and English messages", () => {
 
   it("Arabic strings are actually Arabic", () => {
     const arabic = /[؀-ۿ]/;
-    const exempt = new Set(["common.english", "more.digitsLatin"]);
+    const exempt = new Set(["common.english", "more.digitsLatin", "auth.demoBranch"]);
     for (const [k, v] of Object.entries(arFlat)) if (!exempt.has(k)) expect(arabic.test(v), k).toBe(true);
   });
 });

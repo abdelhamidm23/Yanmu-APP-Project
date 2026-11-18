@@ -89,13 +89,13 @@ pnpm test:e2e            # end-to-end (starts the dev server; resets test accoun
 
 ## Phase 0 decisions and open points
 
-- Sign-in is by email + password. MFA (authenticator app) is enforced for owner, company manager, accountant and HR (spec §14). Per-person PIN on shared class phones comes with the class-phone screens in Phase 3.
+- Sign-in is by email + password. MFA (authenticator app) is enforced for owner, company manager, accountant and HR (spec §14). Per-person PIN on shared class phones arrived in Phase 3.
 - `/` always opens Arabic. The language chosen on the sign-in screen (or in More) is saved per person.
 - HR is not in the spec §11.1 nav table; its shell is Staff · Attendance · More until the owner decides.
 
 ## Phase 1 decisions
 
-- Branches are seeded as "Branch A" and "Branch B" until the owner gives the real names; rename them in Settings → Branches.
+- Branches are Yanmu (code A) and Norvale (code B), named by the owner. Codes A/B stay as the short codes in student and family numbers; names can be changed in Settings → Branches.
 - Settings (users, branches, rooms, age bands, thresholds, audit log) are for the owner and company manager. Branch managers manage holidays for their own branch. Only the owner can grant the owner role; nobody changes their own roles.
 - The weekly working days are organization-wide (default Sunday–Thursday); holidays and extra working days are per branch.
 - Ending a user's access (end date) signs them out everywhere. Password and two-step resets also sign the person out.
@@ -112,3 +112,14 @@ pnpm test:e2e            # end-to-end (starts the dev server; resets test accoun
 - Photos and signed forms are stored in the database (`attachment`, up to 5 MB) so they stay with the data in Egypt, served through `/api/attachment/[id]` under RLS.
 - Phone numbers are stored as 11-digit Egyptian mobiles (`normalizePhone`).
 - `pnpm seed:demo` / `pnpm seed:wipe-demo`: made-up children for demo mode (spec §16 figures). E2E tests reset them with `resetChildren()`; children the tests add are named "E2E …".
+
+## Phase 3 decisions
+
+- Screens: `/roll-call` (room list, one room opens straight away), `/roll-call/[roomId]`, `/my-room` (the teacher's room, pickup tab first), `/today` and `/today/roster` (branch manager; front desk sees attendance without ratios), `/staff` (HR edits; branch manager, owner, company manager and accountant read) and `/staff-attendance` (fingerprint file upload, branch manager and HR). Who may do what is in `drizzle/0006_phase3_attendance_rls.sql`.
+- Roll call works offline: each tap is stored on the phone (IndexedDB, `src/lib/offline-queue.ts`) and sent to `/api/attendance/sync`. `clientUuid` makes a resend harmless; the tap's own time decides which of two taps wins. Taps are only ever sent under the sign-in of the person who made them. The service worker (`public/sw.js`, production only) keeps the roll-call pages; medical notes are never stored on the phone.
+- Check-out only to an adult with "can pick up" on the child's record, enforced by a database trigger. "Not on the list" records a `pickup_refusal`, which the branch manager sees and acknowledges on Today. Children still in 30 minutes after `attendance.closing_time` (default 16:00) show as an alert.
+- Today's attendance figure is present ÷ (present + absent): children not marked yet are not counted as absent (rule 1); the roll-call line says how many rooms are done.
+- Ratio: required carers = ceil(children in the room ÷ the age band's children per staff). A carer counts once confirmed: the manager's tap on the roster wins, otherwise a fingerprint day of present or late. Not confirmed but rostered is "not confirmed", not a breach. `app_take_ratio_snapshot` records the figures after roll call, roster changes and file uploads, only when they change; Today also lists rooms that fell short earlier in the day.
+- Fingerprint file (open item F7): any Hikvision export in .xlsx or .csv. Columns are guessed from English or Arabic titles, confirmed by the person and remembered per branch (`import_mapping`). Times are read as Cairo wall clock. Unknown machine numbers can be linked to a person during the upload. Late = first punch after the shift start plus `staff_attendance.grace_minutes` (default 10). Nobody is marked absent today before their shift and grace have passed. Undo removes the file's punches and works the days out again.
+- Quick PIN sign-in (spec §14): a person sets a 4–6 digit PIN in More on a shared phone; the phone keeps a token per person (up to 12). Five wrong PINs make the phone forget that person. These sessions end after 30 minutes without use. Not offered to roles that need two-step sign-in.
+- Demo (`scripts/seed-demo-attendance.ts`): staff and today's attendance reproduce spec §16; run again on a later day it fills that day. In demo mode the upload card offers a made-up fingerprint file.

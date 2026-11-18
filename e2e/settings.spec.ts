@@ -14,10 +14,10 @@ test.describe("settings (Phase 1)", () => {
     await page.getByTestId("open-settings").click();
     await expect(page).toHaveURL(/\/en\/settings$/);
 
-    // Add a room to Branch A.
+    // Add a room to Yanmu.
     const roomName = `Sunflower ${stamp()}`;
     await page.getByTestId("settings-branches").click();
-    await page.getByTestId("branch-list").getByRole("link", { name: /Branch A/ }).click();
+    await page.getByTestId("branch-list").getByRole("link", { name: /Yanmu/ }).click();
     const form = page.getByTestId("add-room");
     await form.locator("#nr-ar").fill("عباد الشمس");
     await form.locator("#nr-en").fill(roomName);
@@ -26,14 +26,14 @@ test.describe("settings (Phase 1)", () => {
     await expect(page.locator("main [role=status]")).toHaveText("Saved.");
     await expect(page.getByTestId("room-list").locator(`input[value="${roomName}"]`)).toHaveCount(1);
 
-    // Add a teacher for Branch A; a temporary password is shown once.
+    // Add a teacher for Yanmu; a temporary password is shown once.
     const email = `teacher.${stamp()}@yanmu.test`;
     await page.goto("/en/settings/users/new");
     // Nothing on the form is wider than the phone screen.
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.locator("#u-name").fill("New Teacher (test)");
     await page.locator("#u-email").fill(email);
-    await page.getByRole("checkbox", { name: "Teacher · Branch A" }).check();
+    await page.getByRole("checkbox", { name: "Teacher · Yanmu" }).check();
     await page.getByRole("button", { name: "Add a user" }).click();
     await expect(page.getByTestId("temp-password")).toHaveText(/^[A-Z][a-z]+-\d{4}-[A-Z][a-z]+$/);
     await page.goto("/en/settings/users");
@@ -67,7 +67,7 @@ test.describe("settings (Phase 1)", () => {
     await page.goto("/en/settings/calendar");
     const form = page.getByTestId("add-exception");
     await expect(form.locator("#ex-branch option")).toHaveCount(1);
-    await expect(form.locator("#ex-branch option")).toHaveText("Branch A");
+    await expect(form.locator("#ex-branch option")).toHaveText("Yanmu");
     await form.locator("#ex-date").fill(`2031-03-${day}`);
     await form.locator("#ex-note").fill(note);
     await form.getByRole("button").click();

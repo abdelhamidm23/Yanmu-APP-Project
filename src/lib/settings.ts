@@ -38,6 +38,8 @@ export const SETTINGS = [
   def({ key: "age_band.move_up_notice_days", group: "capacity", kind: "integer", schema: z.number().int().min(0).max(365), default: 30 }),
   def({ key: "age_band.leaving_notice_days", group: "capacity", kind: "integer", schema: z.number().int().min(0).max(365), default: 60 }),
   def({ key: "ratio.snapshot_time", group: "operations", kind: "time", schema: time, default: "10:00" }),
+  def({ key: "attendance.closing_time", group: "operations", kind: "time", schema: time, default: "16:00" }),
+  def({ key: "staff_attendance.grace_minutes", group: "operations", kind: "minutes", schema: z.number().int().min(0).max(120), default: 10 }),
   def({ key: "daily_close.prompt_time", group: "operations", kind: "time", schema: time, default: "17:00" }),
   def({ key: "daily_close.due_time", group: "operations", kind: "time", schema: time, default: "19:00" }),
   def({ key: "daily_close.alert_time", group: "operations", kind: "time", schema: time, default: "21:00" }),

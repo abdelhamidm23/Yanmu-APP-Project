@@ -2,7 +2,19 @@ import "server-only";
 import { notFound } from "next/navigation";
 import { redirect } from "@/i18n/navigation";
 import { canOpenSection, type Role, type Section } from "./roles";
-import { canImportChildren, canOpenSettings, canSeeChildApprovals, canViewChildren, canViewWaitlist, isOrgAdmin } from "./permissions";
+import {
+  canImportChildren,
+  canImportPunches,
+  canOpenSettings,
+  canOpenToday,
+  canSeeChildApprovals,
+  canTakeAttendance,
+  canViewChildren,
+  canViewStaff,
+  canViewStaffAttendance,
+  canViewWaitlist,
+  isOrgAdmin,
+} from "./permissions";
 import { getCurrentUser, type CurrentUser } from "./session";
 
 /**
@@ -43,6 +55,22 @@ export async function requireChildren(
     : area === "waitlist" ? canViewWaitlist(user)
     : area === "approvals" ? canSeeChildApprovals(user)
     : canImportChildren(user);
+  if (!allowed) notFound();
+  return user;
+}
+
+/** Attendance, roster and staff screens (spec §5, §8.2, §8.3). Row-level security narrows the rows. */
+export async function requireArea(
+  locale: string,
+  area: "attendance" | "today" | "staff" | "staff-attendance" | "punch-import",
+): Promise<CurrentUser & { activeRole: Role | null }> {
+  const user = await requireUser(locale);
+  const allowed =
+    area === "attendance" ? canTakeAttendance(user)
+    : area === "today" ? canOpenToday(user)
+    : area === "staff" ? canViewStaff(user)
+    : area === "staff-attendance" ? canViewStaffAttendance(user)
+    : canImportPunches(user);
   if (!allowed) notFound();
   return user;
 }

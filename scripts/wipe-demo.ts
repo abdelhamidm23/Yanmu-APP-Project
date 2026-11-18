@@ -1,5 +1,6 @@
 /**
- * Removes every demo child, family, guardian, enrollment and waitlist entry (spec §16).
+ * Removes every demo child, family, guardian, enrollment, waitlist entry, staff member and
+ * attendance record (spec §16).
  * Rooms stay: they are settings, and the owner may have renamed them.
  * Usage: pnpm seed:wipe-demo
  */
@@ -13,6 +14,16 @@ import { fileURLToPath } from "node:url";
 export async function wipeDemo(db: PostgresJsDatabase<any>) {
   await db.transaction(async (tx) => {
     const demo = sql`(select id from student where is_demo)`;
+    const demoStaff = sql`(select id from staff where is_demo)`;
+    await tx.execute(sql`delete from student_attendance where student_id in ${demo}`);
+    await tx.execute(sql`delete from pickup_refusal where student_id in ${demo}`);
+    await tx.execute(sql`delete from ratio_snapshot where is_demo`);
+    await tx.execute(sql`delete from room_roster where staff_id in ${demoStaff}`);
+    await tx.execute(sql`delete from staff_attendance_day where staff_id in ${demoStaff}`);
+    await tx.execute(sql`delete from staff_punch where is_demo or staff_id in ${demoStaff}`);
+    await tx.execute(sql`delete from import_batch where kind = 'staff_punches' and file_name like 'demo-fingerprint-%'
+                         and not exists (select 1 from staff_punch p where p.import_batch_id = import_batch.id)`);
+    await tx.execute(sql`delete from staff where is_demo`);
     await tx.execute(sql`delete from consent_record where student_id in ${demo}`);
     await tx.execute(sql`delete from student_medical where student_id in ${demo}`);
     await tx.execute(sql`delete from student_guardian where student_id in ${demo}`);
@@ -32,6 +43,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (!url) throw new Error("MIGRATION_DATABASE_URL is not set");
   const client = postgres(url, { max: 1, onnotice: () => {} });
   await wipeDemo(drizzle(client));
-  console.log("Demo children, families and waitlist removed.");
+  console.log("Demo children, families, waitlist, staff and attendance removed.");
   await client.end();
 }

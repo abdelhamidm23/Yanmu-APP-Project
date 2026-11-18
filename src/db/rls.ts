@@ -38,7 +38,7 @@ function findPgCode(error: unknown): string | undefined {
   return undefined;
 }
 
-/** Named refusals raised by the database rules (drizzle/0004): over_capacity, age_out_of_range, … */
+/** Named refusals raised by the database rules (drizzle/0004, 0006): over_capacity, pickup_not_approved, … */
 export const DB_RULE_CODES = [
   "over_capacity",
   "age_out_of_range",
@@ -47,6 +47,9 @@ export const DB_RULE_CODES = [
   "own_request",
   "reason_required",
   "changed_since_import",
+  "pickup_not_approved",
+  "not_enrolled",
+  "not_checked_in",
 ] as const;
 export type DbRuleCode = (typeof DB_RULE_CODES)[number];
 

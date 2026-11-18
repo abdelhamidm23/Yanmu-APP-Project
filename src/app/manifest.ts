@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-/** Makes the app installable on phones (add to home screen). Offline support arrives in Phase 3. */
+/** Makes the app installable on phones (add to home screen). Roll call works offline through public/sw.js. */
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "حضانة يانمو — Yanmu Nursery",

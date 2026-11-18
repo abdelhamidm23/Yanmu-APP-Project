@@ -1,5 +1,6 @@
 import "server-only";
 import ExcelJS from "exceljs";
+import { parseCsv } from "./csv";
 
 export interface SheetColumn {
   header: string;
@@ -73,4 +74,44 @@ export async function readSheet<K extends string>(
     if (any) rows.push({ ...out, __row: r });
   }
   return { rows, missing: keys.size === 0 };
+}
+
+export type TableCell = string | number | Date | null;
+
+
+/**
+ * Reads the first sheet of an .xlsx or a .csv as a table: the first non-empty row is the header.
+ * Rows are keyed by header text, for imports whose columns the person maps (spec §8.3).
+ */
+export async function readTable(
+  data: ArrayBuffer,
+  fileName: string,
+  maxRows = 20000,
+): Promise<{ headers: string[]; rows: { cells: Record<string, TableCell>; row: number }[] }> {
+  let grid: { values: TableCell[]; row: number }[];
+  if (/\.csv$/i.test(fileName) || /\.txt$/i.test(fileName)) {
+    grid = parseCsv(new TextDecoder("utf-8").decode(data)).map((values, i) => ({ values, row: i + 1 }));
+  } else {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(data);
+    const ws = wb.worksheets[0];
+    grid = [];
+    if (ws) {
+      ws.eachRow({ includeEmpty: false }, (row, r) => {
+        const values: TableCell[] = [];
+        row.eachCell({ includeEmpty: true }, (cell, col) => {
+          values[col - 1] = cellPlain(cell.value);
+        });
+        grid.push({ values, row: r });
+      });
+    }
+  }
+  const headerRow = grid.find((g) => g.values.some((v) => v !== null && String(v).trim() !== ""));
+  if (!headerRow) return { headers: [], rows: [] };
+  const headers = headerRow.values.map((v, i) => (v === null || v === undefined || String(v).trim() === "" ? `#${i + 1}` : String(v).trim()));
+  const rows = grid
+    .filter((g) => g.row > headerRow.row)
+    .slice(0, maxRows)
+    .map((g) => ({ row: g.row, cells: Object.fromEntries(headers.map((h, i) => [h, g.values[i] ?? null])) }));
+  return { headers, rows };
 }

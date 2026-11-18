@@ -37,7 +37,7 @@ export async function signInWithNewMfa(page: Page, email: string, locale: "ar" |
 
 /**
  * Children tests: removes children the tests added (names start "E2E"), puts the demo children
- * back (Branch A 92, Branch B 61, waitlist 9) and the licence back to 100.
+ * back (Yanmu 92, Norvale 61, waitlist 9) and the licence back to 100.
  */
 export async function resetChildren() {
   const { default: postgres } = await import("postgres");

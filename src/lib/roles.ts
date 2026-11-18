@@ -164,7 +164,7 @@ export const SECTION_PHASE: Record<Section, number> = {
   inbox: 7,
   reports: 7,
   issues: 5,
-  today: 6,
+  today: 3,
   children: 2,
   add: 4,
   money: 4,

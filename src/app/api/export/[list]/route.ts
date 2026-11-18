@@ -3,16 +3,16 @@ import { getTranslations } from "next-intl/server";
 import { z } from "zod";
 import { withUserDb } from "@/db/rls";
 import { AUDITED_TABLES, auditNames, readAudit } from "@/db/audit";
-import { ageBand, appUser, branch, room, userBranchRole, waitlistEntry } from "@/db/schema";
+import { ageBand, appUser, branch, room, staff, staffAttendanceDay, userBranchRole, waitlistEntry } from "@/db/schema";
 import { childList } from "@/db/children";
 import { getCurrentUser } from "@/lib/session";
-import { canViewChildren, canViewWaitlist, isOrgAdmin } from "@/lib/permissions";
+import { canViewChildren, canViewStaff, canViewStaffAttendance, canViewWaitlist, isOrgAdmin } from "@/lib/permissions";
 import { ageInMonths } from "@/lib/children";
 import { localName } from "@/lib/i18n-names";
 import { auditChanges } from "@/lib/audit-diff";
 import { auditFormatter } from "@/lib/audit-format";
 import { formatTimestamp } from "@/lib/format";
-import { todayInCairo } from "@/lib/calendar";
+import { cairoTimeOf, todayInCairo } from "@/lib/calendar";
 import { buildWorkbook, xlsxResponse } from "@/lib/excel";
 
 const notFound = () => new Response("Not found", { status: 404 });
@@ -26,6 +26,64 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
   if (!user || user.mustSetUpMfa) return notFound();
   const t = await getTranslations({ locale });
   const stamp = todayInCairo();
+
+  // Staff and their attendance days (spec §8.3). Row-level security limits the rows.
+  if (list === "staff" || list === "staff-days") {
+    const branchId = z.uuid().safeParse(url.searchParams.get("branch"));
+    const day = z.iso.date().safeParse(url.searchParams.get("date") ?? stamp);
+    if (!branchId.success || !day.success || !(list === "staff" ? canViewStaff(user) : canViewStaffAttendance(user))) return notFound();
+    const data = await withUserDb(user.id, async (tx) => {
+      const [b] = await tx.select().from(branch).where(eq(branch.id, branchId.data));
+      if (!b) return null;
+      const people = await tx
+        .select({ s: staff, roomAr: room.nameAr, roomEn: room.nameEn, d: staffAttendanceDay })
+        .from(staff)
+        .leftJoin(room, eq(room.id, staff.defaultRoomId))
+        .leftJoin(staffAttendanceDay, and(eq(staffAttendanceDay.staffId, staff.id), eq(staffAttendanceDay.date, day.data)))
+        .where(list === "staff" ? eq(staff.branchId, b.id) : and(eq(staff.branchId, b.id), eq(staff.status, "active")))
+        .orderBy(asc(staff.fullNameEn));
+      return { b, people };
+    });
+    if (!data) return notFound();
+    const c = (k: string) => t(`staff.exportColumns.${k}` as "staff.exportColumns.nameAr");
+    if (list === "staff") {
+      const rows = data.people.map(({ s, roomAr, roomEn }) => [
+        s.fullNameAr,
+        s.fullNameEn,
+        s.jobTitle,
+        (locale === "ar" ? roomAr : roomEn) ?? "",
+        s.deviceEmployeeNo ?? "",
+        s.shiftStart,
+        s.isQualifiedCarer ? t("staff.exportColumns.yes") : t("staff.exportColumns.no"),
+        s.startDate ?? "",
+        s.endDate ?? "",
+        s.status === "left" ? t("staff.left") : t("staff.current"),
+      ]);
+      const body = await buildWorkbook(
+        t("staff.title"),
+        ["nameAr", "nameEn", "jobTitle", "usualRoom", "deviceNo", "shiftStart", "carer", "startDate", "endDate", "status"].map((k) => ({ header: c(k) })),
+        rows,
+        locale,
+      );
+      return xlsxResponse(body, `staff-${data.b.code}-${stamp}.xlsx`);
+    }
+    const rows = data.people.map(({ s, d }) => [
+      day.data,
+      s.fullNameAr,
+      s.fullNameEn,
+      s.deviceEmployeeNo ?? "",
+      d?.firstIn ? cairoTimeOf(d.firstIn) : "",
+      d?.lastOut ? cairoTimeOf(d.lastOut) : "",
+      d ? t(`staffAttendance.status.${d.status as "present"}`) : t("staffAttendance.status.none"),
+    ]);
+    const body = await buildWorkbook(
+      t("staffAttendance.title"),
+      ["date", "nameAr", "nameEn", "deviceNo", "firstIn", "lastOut", "status"].map((k) => ({ header: c(k) })),
+      rows,
+      locale,
+    );
+    return xlsxResponse(body, `staff-attendance-${data.b.code}-${day.data}.xlsx`);
+  }
 
   // Children and waitlist: everyone who can open those screens; row-level security limits the rows.
   if (list === "children" || list === "waitlist") {

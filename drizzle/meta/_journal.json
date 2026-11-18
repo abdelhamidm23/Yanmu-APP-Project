@@ -36,6 +36,20 @@
       "when": 1795016244633,
       "tag": "0004_phase2_children_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795026772041,
+      "tag": "0005_phase3_attendance",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795026772880,
+      "tag": "0006_phase3_attendance_rls",
+      "breakpoints": true
     }
   ]
 }

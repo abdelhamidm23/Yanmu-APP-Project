@@ -23,4 +23,10 @@ export const AUDITED_TABLES = [
   "approval_request",
   "enrollment",
   "waitlist_entry",
+  // Phase 3 (drizzle/0006)
+  "staff",
+  "room_roster",
+  "student_attendance",
+  "pickup_refusal",
+  "import_mapping",
 ] as const;

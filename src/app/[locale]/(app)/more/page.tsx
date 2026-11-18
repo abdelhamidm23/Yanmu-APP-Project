@@ -1,12 +1,12 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { requireSection } from "@/lib/require-user";
-import { canOpenSettings, canViewChildren } from "@/lib/permissions";
-import { canOpenSection } from "@/lib/roles";
+import { canOpenSettings, canOpenToday, canTakeAttendance, canViewChildren, canViewStaff, canViewStaffAttendance } from "@/lib/permissions";
+import { canOpenSection, requiresMfa } from "@/lib/roles";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Button, buttonClasses } from "@/components/ui/Button";
-import { savePreferences, switchRole } from "./actions";
+import { forgetPin, savePreferences, setUpPin, switchRole } from "./actions";
 import { SignOutButton } from "./SignOutButton";
 
 function Segment({ name, options, value }: { name: string; options: { value: string; label: string; lang?: string }[]; value: string }) {
@@ -32,10 +32,10 @@ export default async function MorePage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ saved?: string }>;
+  searchParams: Promise<{ saved?: string; pin?: string }>;
 }) {
   const { locale } = await params;
-  const { saved } = await searchParams;
+  const { saved, pin } = await searchParams;
   const user = await requireSection(locale, "more");
   const t = await getTranslations();
 
@@ -68,6 +68,26 @@ export default async function MorePage({
           <span className="text-[14px] text-muted">{t("more.childrenLink")}</span>
         </Link>
       ) : null}
+
+      {[
+        { show: canOpenToday(user) && !(user.activeRole && canOpenSection(user.activeRole, "today")), href: "/today", title: t("today.title"), text: t("more.todayLink"), id: "open-today" },
+        { show: canTakeAttendance(user) && !(user.activeRole && canOpenSection(user.activeRole, "roll-call")), href: "/roll-call", title: t("attendance.rollCallTitle"), text: t("more.rollCallLink"), id: "open-roll-call" },
+        { show: canViewStaff(user) && !(user.activeRole && canOpenSection(user.activeRole, "staff")), href: "/staff", title: t("staff.title"), text: t("more.staffLink"), id: "open-staff" },
+        {
+          show: canViewStaffAttendance(user) && !(user.activeRole && canOpenSection(user.activeRole, "staff-attendance")),
+          href: "/staff-attendance",
+          title: t("staffAttendance.title"),
+          text: t("more.staffAttendanceLink"),
+          id: "open-staff-attendance",
+        },
+      ]
+        .filter((l) => l.show)
+        .map((l) => (
+          <Link key={l.id} href={l.href} data-testid={l.id} className="flex min-h-11 flex-col gap-1 rounded-card border border-border bg-surface p-4 hover:bg-bg">
+            <span className="text-section-title font-semibold">{l.title}</span>
+            <span className="text-[14px] text-muted">{l.text}</span>
+          </Link>
+        ))}
 
       {canOpenSettings(user) ? (
         <Link
@@ -136,6 +156,40 @@ export default async function MorePage({
           </Link>
         ) : null}
       </Card>
+
+      {!requiresMfa(user.roles) ? (
+        <Card className="flex flex-col gap-3" data-testid="pin-card">
+          <h2 className="text-section-title font-semibold">{t("more.pinTitle")}</h2>
+          <p className="text-[14px] text-muted">{t("more.pinHelp")}</p>
+          {pin ? (
+            <Alert tone={pin === "ok" || pin === "removed" ? "good" : "critical"}>{t(`more.pinResult.${pin === "ok" || pin === "removed" || pin === "weak" || pin === "mismatch" ? pin : "needsMfa"}`)}</Alert>
+          ) : null}
+          <form action={setUpPin} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <input type="hidden" name="locale" value={locale} />
+            <div className="flex flex-col gap-1">
+              <label htmlFor="pin" className="text-[13px] font-medium text-subtle">
+                {t("more.pin")}
+              </label>
+              <input id="pin" name="pin" type="password" inputMode="numeric" pattern="[0-9]{4,6}" minLength={4} maxLength={6} required autoComplete="new-password" dir="ltr" className="min-h-11 rounded-button border border-outline bg-surface px-3 text-[15px]" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label htmlFor="pinAgain" className="text-[13px] font-medium text-subtle">
+                {t("more.pinAgain")}
+              </label>
+              <input id="pinAgain" name="pinAgain" type="password" inputMode="numeric" pattern="[0-9]{4,6}" minLength={4} maxLength={6} required autoComplete="new-password" dir="ltr" className="min-h-11 rounded-button border border-outline bg-surface px-3 text-[15px]" />
+            </div>
+            <Button type="submit" data-testid="save-pin">
+              {t("more.pinSave")}
+            </Button>
+          </form>
+          <form action={forgetPin}>
+            <input type="hidden" name="locale" value={locale} />
+            <button type="submit" className="text-[14px] text-brand underline">
+              {t("more.pinForget")}
+            </button>
+          </form>
+        </Card>
+      ) : null}
 
       <SignOutButton />
     </div>
