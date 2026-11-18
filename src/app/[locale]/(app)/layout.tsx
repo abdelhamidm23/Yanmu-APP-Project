@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { AppNav } from "@/components/AppNav";
 import { DemoPill } from "@/components/DemoPill";
+import { ServiceWorker } from "@/components/ServiceWorker";
 import { NAV_BY_ROLE } from "@/lib/roles";
 import { requireUser } from "@/lib/require-user";
 
@@ -35,6 +36,7 @@ export default async function AppLayout({
           </div>
         </div>
       </header>
+      <ServiceWorker />
       <AppNav items={items} />
       <main id="main" className="mx-auto max-w-3xl px-4 pb-28 pt-5 md:ms-60 md:max-w-4xl md:px-8 md:pb-10">
         {children}

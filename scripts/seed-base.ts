@@ -2,7 +2,7 @@
  * Creates the organization, the four age bands (spec §2.1), two branches and every
  * setting default (spec §17.3). Safe to run again: it only adds what is missing.
  *
- * Branch names are placeholders ("Branch A" / "Branch B") until the owner renames them in Settings.
+ * Branches are Yanmu (code A) and Norvale (code B), named by the owner on 2026-11-18. Names can be changed in Settings.
  * Usage: pnpm seed:base
  */
 import "dotenv/config";
@@ -37,11 +37,16 @@ for (const b of bands) {
 }
 
 const branches = [
-  { code: "A", nameAr: "الفرع أ", nameEn: "Branch A" },
-  { code: "B", nameAr: "الفرع ب", nameEn: "Branch B" },
+  { code: "A", nameAr: "يانمو", nameEn: "Yanmu" },
+  { code: "B", nameAr: "نورفال", nameEn: "Norvale" },
 ];
 for (const b of branches) {
   await db.insert(schema.branch).values({ orgId: org.id, ...b }).onConflictDoNothing();
+  // Databases seeded before the owner chose the names still say "Branch A" / "Branch B".
+  await db
+    .update(schema.branch)
+    .set({ nameAr: b.nameAr, nameEn: b.nameEn })
+    .where(and(eq(schema.branch.orgId, org.id), eq(schema.branch.code, b.code), eq(schema.branch.nameEn, `Branch ${b.code}`)));
 }
 
 for (const s of SETTINGS) {

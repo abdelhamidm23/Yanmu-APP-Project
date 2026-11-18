@@ -65,6 +65,8 @@ export const appUser = pgTable("app_user", {
   endDate: date("end_date"),
   /** Last time a manager issued a temporary password (audited; the password never is). */
   credentialsResetAt: timestamp("credentials_reset_at", { withTimezone: true }),
+  /** Quick sign-in PIN for shared class phones (spec §7.2, §14). scrypt hash; never stored in clear. */
+  pinHash: text("pin_hash"),
   ...timestamps,
 });
 
@@ -79,9 +81,34 @@ export const authSession = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => appUser.id, { onDelete: "cascade" }),
+    /** Signed in with a PIN on a shared class phone: ends after 30 minutes without use (spec §14). */
+    sharedDevice: boolean("shared_device").notNull().default(false),
+    /** Last request on a shared-phone session; 30 minutes without one ends it. */
+    lastActiveAt: timestamp("last_active_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [index("auth_session_user_idx").on(t.userId)],
+);
+
+/**
+ * A person who set up quick sign-in on a shared class phone. The phone keeps a random token
+ * in a cookie; only its SHA-256 hash is stored. Like the other auth tables, it is used by the
+ * sign-in code before anyone is signed in, so it has no row-level security.
+ */
+export const deviceLogin = pgTable(
+  "device_login",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => appUser.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    failedAttempts: integer("failed_attempts").notNull().default(0),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [index("device_login_user_idx").on(t.userId)],
 );
 
 export const authAccount = pgTable(
@@ -598,4 +625,205 @@ export const waitlistEntry = pgTable(
     index("waitlist_branch_status_idx").on(t.branchId, t.status),
     check("waitlist_status_check", sql`${t.status} IN ('waiting', 'converted', 'cancelled')`),
   ],
+);
+
+// ---------------------------------------------------------------------------
+// Spec §7.2 staff and §7.4 attendance (Phase 3)
+// ---------------------------------------------------------------------------
+
+/** A member of staff (spec §7.2). Linked to a sign-in account when they have one. */
+export const staff = pgTable(
+  "staff",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    userId: uuid("user_id").references(() => appUser.id),
+    fullNameAr: text("full_name_ar").notNull(),
+    fullNameEn: text("full_name_en").notNull(),
+    jobTitle: text("job_title").notNull(),
+    /** Counts towards the staff : children ratio (spec §8.3). */
+    isQualifiedCarer: boolean("is_qualified_carer").notNull().default(true),
+    defaultRoomId: uuid("default_room_id").references(() => room.id),
+    /** The number this person has on the fingerprint device (Hikvision export). */
+    deviceEmployeeNo: text("device_employee_no"),
+    /** Expected arrival, HH:MM Cairo time; later than this plus the grace minutes counts as late. */
+    shiftStart: text("shift_start").notNull().default("08:00"),
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    status: text("status").notNull().default("active"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    index("staff_branch_idx").on(t.branchId),
+    uniqueIndex("staff_user_unique").on(t.userId).where(sql`${t.userId} IS NOT NULL`),
+    uniqueIndex("staff_device_no_unique").on(t.branchId, t.deviceEmployeeNo).where(sql`${t.deviceEmployeeNo} IS NOT NULL`),
+    check("staff_status_check", sql`${t.status} IN ('active', 'left')`),
+    check("staff_shift_check", sql`${t.shiftStart} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`),
+  ],
+);
+
+/**
+ * Who works in which room on a day (spec §7.4). Without a row, a person is in their default room.
+ * room_id NULL = not in a room today. marked_present is the manager's tap before the fingerprint file arrives.
+ */
+export const roomRoster = pgTable(
+  "room_roster",
+  {
+    staffId: uuid("staff_id")
+      .notNull()
+      .references(() => staff.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    roomId: uuid("room_id").references(() => room.id),
+    markedPresent: boolean("marked_present"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [primaryKey({ columns: [t.staffId, t.date] }), index("room_roster_branch_date_idx").on(t.branchId, t.date)],
+);
+
+/** One child, one day (spec §7.4). Offline taps carry a client id and time so replays and late arrivals are harmless. */
+export const studentAttendance = pgTable(
+  "student_attendance",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => room.id),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => student.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    status: text("status").notNull(),
+    excuseReason: text("excuse_reason"),
+    checkInAt: timestamp("check_in_at", { withTimezone: true }),
+    checkOutAt: timestamp("check_out_at", { withTimezone: true }),
+    collectedByGuardianId: uuid("collected_by_guardian_id").references(() => guardian.id),
+    /** The last tap applied (offline idempotency, spec §8.2). */
+    clientUuid: uuid("client_uuid"),
+    clientAt: timestamp("client_at", { withTimezone: true }),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    unique("student_attendance_day_unique").on(t.studentId, t.date),
+    index("student_attendance_branch_date_idx").on(t.branchId, t.date),
+    check("student_attendance_status_check", sql`${t.status} IN ('present', 'absent', 'excused')`),
+  ],
+);
+
+/** Someone not on the approved list tried to collect a child (spec §8.2). Never a silent release. */
+export const pickupRefusal = pgTable(
+  "pickup_refusal",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => student.id, { onDelete: "cascade" }),
+    personName: text("person_name"),
+    note: text("note"),
+    happenedAt: timestamp("happened_at", { withTimezone: true }).notNull().defaultNow(),
+    clientUuid: uuid("client_uuid").unique(),
+    acknowledgedBy: uuid("acknowledged_by").references(() => appUser.id),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [index("pickup_refusal_branch_idx").on(t.branchId, t.happenedAt)],
+);
+
+/** One fingerprint punch from the device export (spec §8.3). */
+export const staffPunch = pgTable(
+  "staff_punch",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    staffId: uuid("staff_id").references(() => staff.id, { onDelete: "set null" }),
+    deviceEmployeeNo: text("device_employee_no").notNull(),
+    personName: text("person_name"),
+    punchedAt: timestamp("punched_at", { withTimezone: true }).notNull(),
+    device: text("device"),
+    importBatchId: uuid("import_batch_id").references(() => importBatch.id),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    unique("staff_punch_unique").on(t.branchId, t.deviceEmployeeNo, t.punchedAt),
+    index("staff_punch_batch_idx").on(t.importBatchId),
+    index("staff_punch_staff_idx").on(t.staffId, t.punchedAt),
+  ],
+);
+
+/** Derived from punches for each day a file covers (spec §8.3). */
+export const staffAttendanceDay = pgTable(
+  "staff_attendance_day",
+  {
+    staffId: uuid("staff_id")
+      .notNull()
+      .references(() => staff.id, { onDelete: "cascade" }),
+    date: date("date").notNull(),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    firstIn: timestamp("first_in", { withTimezone: true }),
+    lastOut: timestamp("last_out", { withTimezone: true }),
+    status: text("status").notNull(),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    primaryKey({ columns: [t.staffId, t.date] }),
+    index("staff_attendance_day_branch_idx").on(t.branchId, t.date),
+    check("staff_attendance_day_status_check", sql`${t.status} IN ('present', 'late', 'absent', 'leave')`),
+  ],
+);
+
+/** Saved column choices for a spreadsheet kind, per branch (spec §8.3: map once, reuse). */
+export const importMapping = pgTable(
+  "import_mapping",
+  {
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    kind: text("kind").notNull(),
+    mapping: jsonb("mapping").notNull(),
+    ...tracked,
+  },
+  (t) => [primaryKey({ columns: [t.branchId, t.kind] })],
+);
+
+/** Staff : children ratio for a room at a moment (spec §8.3). */
+export const ratioSnapshot = pgTable(
+  "ratio_snapshot",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => room.id),
+    takenAt: timestamp("taken_at", { withTimezone: true }).notNull().defaultNow(),
+    childrenPresent: integer("children_present").notNull(),
+    carersPresent: integer("carers_present").notNull(),
+    requiredCarers: integer("required_carers").notNull(),
+    isBreach: boolean("is_breach").notNull(),
+    reason: text("reason").notNull(),
+    isDemo: boolean("is_demo").notNull().default(false),
+    createdBy: uuid("created_by").default(actorDefault),
+  },
+  (t) => [index("ratio_snapshot_room_idx").on(t.roomId, t.takenAt), index("ratio_snapshot_branch_idx").on(t.branchId, t.takenAt)],
 );

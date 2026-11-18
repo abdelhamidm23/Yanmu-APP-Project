@@ -127,7 +127,7 @@ test.describe("children (Phase 2)", () => {
     await expect(page.getByTestId("add-child")).toHaveCount(0);
   });
 
-  test("transfer: Branch A asks, Branch B's manager accepts, the child keeps one record", async ({ page }) => {
+  test("transfer: Yanmu asks, Norvale's manager accepts, the child keeps one record", async ({ page }) => {
     const [kid] = await ownerQuery<{ id: string; name: string }>(
       (sql) => sql`select s.id, s.full_name_en as name from student s join branch b on b.id = s.branch_id
                    join enrollment e on e.student_id = s.id and e.status = 'active'
@@ -137,10 +137,10 @@ test.describe("children (Phase 2)", () => {
     await signIn(page, "front.desk@yanmu.test", "en");
     await page.goto(`/en/children/${kid.id}`);
     const form = page.getByTestId("transfer-form");
-    await form.locator("#tr-branch").selectOption({ label: "Branch B" });
-    await form.locator("#tr-reason").fill("Family moved closer to Branch B");
+    await form.locator("#tr-branch").selectOption({ label: "Norvale" });
+    await form.locator("#tr-reason").fill("Family moved closer to Norvale");
     await form.getByRole("button").click();
-    await expect(page.getByTestId("pending-request")).toContainText("Transfer to Branch B");
+    await expect(page.getByTestId("pending-request")).toContainText("Transfer to Norvale");
 
     await page.context().clearCookies();
     await signIn(page, "branch.manager.b@yanmu.test", "en");
@@ -151,8 +151,8 @@ test.describe("children (Phase 2)", () => {
     await expect(page.locator("main [role=status]")).toHaveText("Saved.");
 
     await page.goto(`/en/children/${kid.id}`);
-    await expect(page.getByTestId("enrollment-history")).toContainText("Branch B · Juniors 1 · Enrolled");
-    await expect(page.getByTestId("enrollment-history")).toContainText("Branch A · Moved to another branch");
+    await expect(page.getByTestId("enrollment-history")).toContainText("Norvale · Juniors 1 · Enrolled");
+    await expect(page.getByTestId("enrollment-history")).toContainText("Yanmu · Moved to another branch");
   });
 
   test("company manager imports children from Excel, fixes a row error, then undoes the import", async ({ page }) => {
@@ -191,7 +191,7 @@ test.describe("children (Phase 2)", () => {
     await expect(page.getByTestId("occupancy")).toContainText("92 of 100");
   });
 
-  test("waitlist: 9 waiting at Branch A; enrolling one fills in the form", async ({ page }) => {
+  test("waitlist: 9 waiting at Yanmu; enrolling one fills in the form", async ({ page }) => {
     await signIn(page, "branch.manager@yanmu.test", "en");
     await page.goto("/en/children/waitlist");
     await expect(page.getByTestId("waitlist-summary")).toContainText("9 children waiting");

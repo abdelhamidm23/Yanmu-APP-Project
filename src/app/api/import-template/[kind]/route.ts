@@ -3,17 +3,26 @@ import { z } from "zod";
 import { withUserDb } from "@/db/rls";
 import { branchRooms } from "@/db/children";
 import { getCurrentUser } from "@/lib/session";
-import { canImportChildren } from "@/lib/permissions";
+import { canImportChildren, canImportPunches } from "@/lib/permissions";
 import { IMPORT_COLUMNS } from "@/lib/child-import";
 import { RELATIONSHIPS } from "@/lib/children";
 import { xlsxResponse } from "@/lib/excel";
+import { isDemoMode } from "@/lib/demo";
+import { samplePunchFile } from "./staff-punches";
 
 const notFound = () => new Response("Not found", { status: 404 });
 
 /** Empty children template with a second sheet explaining each column and listing the branch's rooms. */
 export async function GET(req: Request, { params }: { params: Promise<{ kind: string }> }) {
-  if ((await params).kind !== "children") return notFound();
+  const kind = (await params).kind;
   const url = new URL(req.url);
+  if (kind === "staff-punches") {
+    const branch = z.uuid().safeParse(url.searchParams.get("branch"));
+    const who = await getCurrentUser();
+    if (!isDemoMode() || !who || who.mustSetUpMfa || !branch.success || !canImportPunches(who, branch.data)) return notFound();
+    return samplePunchFile(who, branch.data);
+  }
+  if (kind !== "children") return notFound();
   const ar = url.searchParams.get("locale") !== "en";
   const branchId = z.uuid().safeParse(url.searchParams.get("branch"));
   const user = await getCurrentUser();

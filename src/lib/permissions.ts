@@ -74,3 +74,41 @@ export function canViewWaitlist(user: U): boolean {
 export function canSeeChildApprovals(user: U): boolean {
   return hasAnyRole(user, ["owner", "company_manager", "branch_manager", "front_desk"]);
 }
+
+/** Spec §5 "Child attendance, pickup": branch manager and front desk (own branch), teachers (own room). */
+export const ATTENDANCE_EDIT_ROLES = ["branch_manager", "front_desk"] as const;
+
+export function canTakeAttendance(user: U, branchId?: string): boolean {
+  return branchId ? hasRoleIn(user, ATTENDANCE_EDIT_ROLES, branchId) : hasAnyRole(user, [...ATTENDANCE_EDIT_ROLES, "teacher"]);
+}
+
+/** Branch "Today" screen (spec §11.6): branch manager and front desk. */
+export function canOpenToday(user: U): boolean {
+  return hasAnyRole(user, ATTENDANCE_EDIT_ROLES);
+}
+
+/** Spec §5 "Staff records": HR edits; owner, company manager, branch manager (own) and accountant view. */
+export const STAFF_VIEW_ROLES = ["owner", "company_manager", "branch_manager", "accountant", "hr"] as const;
+
+export function canViewStaff(user: U): boolean {
+  return hasAnyRole(user, STAFF_VIEW_ROLES);
+}
+
+export function canEditStaff(user: U, branchId?: string): boolean {
+  return branchId ? hasRoleIn(user, ["hr"], branchId) : hasAnyRole(user, ["hr"]);
+}
+
+/** Fingerprint file uploads and linking device numbers: branch manager (own) and HR (spec §5 Imports). */
+export function canImportPunches(user: U, branchId?: string): boolean {
+  return branchId ? hasRoleIn(user, ["branch_manager", "hr"], branchId) : hasAnyRole(user, ["branch_manager", "hr"]);
+}
+
+/** Daily room roster and the "present" tap: branch manager (spec §8.3). */
+export function canEditRoster(user: U, branchId: string): boolean {
+  return hasRoleIn(user, ["branch_manager"], branchId);
+}
+
+/** Staff attendance days and ratios: who reads them. */
+export function canViewStaffAttendance(user: U): boolean {
+  return hasAnyRole(user, ["owner", "company_manager", "branch_manager", "hr"]);
+}

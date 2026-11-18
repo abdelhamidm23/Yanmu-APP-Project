@@ -1,6 +1,7 @@
 /**
- * Demo children for the online preview (spec §16): Branch A 92 children in 7 rooms, Branch B 61 in 5,
- * and a Branch A waitlist of 9 (Toddlers 6, Babies 3). All names are made up and every row is
+ * Demo children for the online preview (spec §16): Yanmu (code A) 92 children in 7 rooms, Norvale (B) 61 in 5,
+ * a Yanmu waitlist of 9 (Toddlers 6, Babies 3), staff and today's attendance (seed-demo-attendance.ts).
+ * All names are made up and every row is
  * flagged is_demo. `pnpm seed:wipe-demo` removes them again.
  *
  * Refuses to run in production unless DEMO_MODE=true.
@@ -15,6 +16,7 @@ import * as schema from "../src/db/schema";
 import { todayInCairo } from "../src/lib/calendar";
 import { addDays, addMonths } from "../src/lib/children";
 import { wipeDemo } from "./wipe-demo";
+import { seedDemoAttendance } from "./seed-demo-attendance";
 
 if (process.env.NODE_ENV === "production" && process.env.DEMO_MODE !== "true") {
   console.error("Refusing to add demo data in production (only allowed when DEMO_MODE=true).");
@@ -83,6 +85,7 @@ const reset = process.argv.includes("--reset");
 const [existing] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.student).where(eq(schema.student.isDemo, true));
 if (existing.n > 0 && !reset) {
   console.log(`Demo children already there (${existing.n}). Use --reset to recreate them.`);
+  console.log(await seedDemoAttendance(db));
   await client.end();
   process.exit(0);
 }
@@ -185,7 +188,7 @@ for (const code of ["A", "B"] as const) {
   if (teacher && toddlers) await db.insert(schema.userRoom).values({ userId: teacher.id, roomId: toddlers.id, branchId: b.id }).onConflictDoNothing();
 
   if (code === "A") {
-    // Spec §16: waitlist of 9 at Branch A (Toddlers 6, Babies 3).
+    // Spec §16: waitlist of 9 at Yanmu (Toddlers 6, Babies 3).
     for (const [bandKey, n] of [["toddlers", 6], ["babies", 3]] as const) {
       const bd = band(bandKey);
       for (let i = 0; i < n; i++) {
@@ -207,5 +210,6 @@ for (const code of ["A", "B"] as const) {
   }
 }
 
-console.log(`Demo children ready: ${total} (Branch A 92, Branch B 61) and a waitlist of 9 at Branch A.`);
+console.log(`Demo children ready: ${total} (Yanmu 92, Norvale 61) and a waitlist of 9 at Yanmu.`);
+console.log(await seedDemoAttendance(db));
 await client.end();

@@ -5,6 +5,7 @@ import { nextCookies } from "better-auth/next-js";
 import { twoFactor } from "better-auth/plugins";
 import { db } from "@/db";
 import { authSchema } from "@/db/schema";
+import { pinLogin } from "./pin-auth";
 
 const extraOrigins = (process.env.TRUSTED_ORIGINS ?? "")
   .split(",")
@@ -37,9 +38,13 @@ export const auth = betterAuth({
     minPasswordLength: 10,
   },
   session: {
-    // Spec §14: 12 h sessions on personal phones. Shared class phones (30 min idle + PIN) come in Phase 3.
+    // Spec §14: 12 h sessions on personal phones. Shared class phones: PIN sign-in and 30 minutes idle (src/lib/pin-auth.ts).
     expiresIn: 60 * 60 * 12,
     updateAge: 60 * 60,
+    additionalFields: {
+      sharedDevice: { type: "boolean", required: false, defaultValue: false, input: false },
+      lastActiveAt: { type: "date", required: false, input: false },
+    },
   },
   rateLimit: {
     enabled: process.env.AUTH_RATE_LIMIT !== "off",
@@ -48,9 +53,10 @@ export const auth = betterAuth({
     customRules: {
       "/sign-in/email": { window: 60, max: 10 },
       "/two-factor/verify-totp": { window: 60, max: 10 },
+      "/pin/sign-in": { window: 60, max: 10 },
     },
   },
-  plugins: [twoFactor({ issuer: "Yanmu Nursery" }), nextCookies()],
+  plugins: [twoFactor({ issuer: "Yanmu Nursery" }), pinLogin(), nextCookies()],
 });
 
 export type Session = typeof auth.$Infer.Session;

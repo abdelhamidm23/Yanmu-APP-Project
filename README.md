@@ -9,6 +9,8 @@ A phone-first web app for the Walid Ibrahim Group's two Yanmu nursery branches: 
 
 - **Phase 0 (setup)** — sign-in with two-step verification, Arabic/English with right-to-left layout, design system, and the bottom navigation for every role.
 - **Phase 1 (foundation)** — branches, rooms, age bands, the working-day calendar and holidays, users and their roles per branch, adjustable thresholds, and the audit log. Open **More → Settings**. The database itself stops anyone from seeing or changing another branch's data, and every change is recorded.
+- **Phase 2 (children)** — children, families and guardians, enrollment by age band with the licence cap, waitlist, transfers, withdrawals, medical notes and consents, and the spreadsheet import with undo.
+- **Phase 3 (attendance)** — roll call on a class phone that keeps working without a connection, check-out only to an approved adult (a refusal is recorded and shown to the branch manager), the branch manager's **Today** screen with attendance and staff : children ratios by room, the day's room roster, staff records, the fingerprint machine file (Hikvision) with column matching, preview and undo, and quick PIN sign-in for shared class phones.
 
 The other tabs are placeholders that say which phase fills them in.
 
@@ -19,7 +21,7 @@ A demo with made-up data runs as a free **Hugging Face Space**. It needs no card
 - The sign-in screen lists one demo account per role. Tap one to sign in. The password for all of them is shown there too.
 - Two-step sign-in is offered but not forced in the demo, so every role can be opened without an authenticator app.
 - The Space sleeps after two days without visitors, and the first visit after that takes a few minutes.
-- It starts with made-up children (Branch A 92, Branch B 61, a waitlist of 9), marked "Demo data". `pnpm seed:demo` adds them anywhere else and `pnpm seed:wipe-demo` removes them.
+- It starts with made-up children (Yanmu 92, Norvale 61, a waitlist of 9), staff (26 and 17) and today's attendance (Yanmu 82 of 89, Norvale 43 of 48 with one room not taken yet, and one ratio breach in Norvale Toddlers), marked "Demo data". Staff attendance has a made-up fingerprint file to download and try. `pnpm seed:demo` adds them anywhere else and `pnpm seed:wipe-demo` removes them.
 - **Never enter real children, families or staff in the demo.** It is not hosted in Egypt (rule 10).
 
 To set it up: create a free account at huggingface.co, then make a new Space (SDK **Docker**, template **Blank**, hardware **CPU basic**, visibility **Public**). Add a file named `Dockerfile` with the contents of [`deploy/huggingface/Dockerfile`](deploy/huggingface/Dockerfile). Open the app at `https://<user>-<space>.hf.space`, not on the huggingface.co page, which shows it inside a frame. To load newer code from the `preview` branch, press **Settings → Factory rebuild** in the Space.
@@ -46,13 +48,13 @@ You need **Docker Desktop** (free): https://www.docker.com/products/docker-deskt
 | --- | --- | --- |
 | `owner@yanmu.test` | Owner | Asks you to set up two-step sign-in first |
 | `company.manager@yanmu.test` | Company manager | Two-step sign-in |
-| `branch.manager@yanmu.test` | Branch manager, Branch A | Can add holidays for Branch A only |
-| `branch.manager.b@yanmu.test` | Branch manager, Branch B | Sees only Branch B |
+| `branch.manager@yanmu.test` | Branch manager, Yanmu | Can add holidays for Yanmu only |
+| `branch.manager.b@yanmu.test` | Branch manager, Norvale | Sees only Norvale |
 | `accountant@yanmu.test` | Accountant | Two-step sign-in |
 | `hr@yanmu.test` | HR | Two-step sign-in |
-| `front.desk@yanmu.test` | Front desk, Branch A | |
-| `teacher@yanmu.test` | Teacher, Branch A | |
-| `multi.role@yanmu.test` | Front desk + Teacher, Branch B | Shows the role switch in More |
+| `front.desk@yanmu.test` | Front desk, Yanmu | |
+| `teacher@yanmu.test` | Teacher, Yanmu | |
+| `multi.role@yanmu.test` | Front desk + Teacher, Norvale | Shows the role switch in More |
 
 Settings (users, rooms, thresholds, audit log) are open to the owner and company manager. Branch managers see the calendar for their own branch.
 
