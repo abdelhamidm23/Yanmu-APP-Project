@@ -63,7 +63,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
         c.isDemo ? t("app.demoData") : "",
       ]);
       const cols = ["number", "nameAr", "nameEn", "dob", "ageLabel", "genderLabel", "room", "startLabel", "statusLabel", "consentLabel", "demoLabel"].map((k) => ({
-        header: t(`children.export.${k as "number"}`),
+        header: t(`children.exportColumns.${k as "number"}`),
         width: k.startsWith("name") ? 28 : 16,
       }));
       return xlsxResponse(await buildWorkbook(`${t("children.title")} ${data.b.code}`, cols, rows, locale), `children-${data.b.code}-${stamp}.xlsx`);
@@ -78,7 +78,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
       w.guardianPhone,
       w.notes ?? "",
     ]);
-    const cols = ["childName", "dob", "ageLabel", "band", "month", "guardianName", "phone", "notes"].map((k) => ({ header: t(`children.export.${k as "number"}`), width: 22 }));
+    const cols = ["childName", "dob", "ageLabel", "band", "month", "guardianName", "phone", "notes"].map((k) => ({ header: t(`children.exportColumns.${k as "number"}`), width: 22 }));
     return xlsxResponse(await buildWorkbook(t("children.waitlistPage.title"), cols, rows, locale), `waitlist-${data.b.code}-${stamp}.xlsx`);
   }
 

@@ -411,10 +411,10 @@ BEGIN
   DELETE FROM consent_record WHERE student_id IN (SELECT id FROM student WHERE import_batch_id = p_batch);
   DELETE FROM student_medical WHERE student_id IN (SELECT id FROM student WHERE import_batch_id = p_batch);
   DELETE FROM student_guardian WHERE student_id IN (SELECT id FROM student WHERE import_batch_id = p_batch);
+  DELETE FROM enrollment WHERE import_batch_id = p_batch;
   DELETE FROM approval_request WHERE student_id IN (SELECT id FROM student WHERE import_batch_id = p_batch);
   UPDATE waitlist_entry SET converted_student_id = NULL, status = 'waiting'
     WHERE converted_student_id IN (SELECT id FROM student WHERE import_batch_id = p_batch);
-  DELETE FROM enrollment WHERE import_batch_id = p_batch;
   DELETE FROM student WHERE import_batch_id = p_batch;
   DELETE FROM guardian WHERE import_batch_id = p_batch
     AND NOT EXISTS (SELECT 1 FROM student_guardian sg WHERE sg.guardian_id = guardian.id);

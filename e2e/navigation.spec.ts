@@ -16,14 +16,10 @@ test("branch manager sees the branch manager tabs and the + Add sheet", async ({
   const nav = page.getByRole("navigation", { name: "Main navigation" });
   await expect(nav.getByRole("link")).toHaveText(["Today", "Children", "Add", "Issues", "More"]);
   await page.getByTestId("nav-add").click();
-  await expect(page.getByTestId("add-actions").getByRole("button")).toHaveText([
-    "Payment",
-    "Expense",
-    "Incident",
-    "Issue",
-    "Child",
-    "Roll call",
-  ]);
+  // Phase 2: "Child" opens the add-child form; the rest arrive in later phases.
+  await expect(page.getByTestId("add-actions").getByRole("button")).toHaveText(["Payment", "Expense", "Incident", "Issue", "Roll call"]);
+  await page.getByTestId("add-child").click();
+  await expect(page).toHaveURL(/\/en\/children\/new$/);
 });
 
 test("the server refuses screens outside your role (not just hidden tabs)", async ({ page }) => {

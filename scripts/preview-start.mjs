@@ -37,7 +37,7 @@ const env = {
   NEXT_TELEMETRY_DISABLED: "1",
 };
 
-for (const cmd of ["pnpm -s db:migrate", "pnpm -s seed:base", "pnpm -s seed:dev-users --reset"]) {
+for (const cmd of ["pnpm -s db:migrate", "pnpm -s seed:base", "pnpm -s seed:dev-users --reset", "pnpm -s seed:demo"]) {
   console.log(`> ${cmd}`);
   execSync(cmd, { stdio: "inherit", env });
 }

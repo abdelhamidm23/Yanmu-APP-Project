@@ -4,7 +4,7 @@ import { withUserDb } from "@/db/rls";
 import { activeCount, branchRooms, childList, pendingApprovalCount, visibleBranches } from "@/db/children";
 import { requireChildren } from "@/lib/require-user";
 import { canEditChildren, canImportChildren, canSeeChildApprovals, canViewWaitlist } from "@/lib/permissions";
-import { ageInMonths, childAlerts, occupancy } from "@/lib/children";
+import { LEAVING_WINDOW_DAYS, MOVING_UP_WINDOW_DAYS, ageInMonths, childAlerts, occupancy } from "@/lib/children";
 import { todayInCairo } from "@/lib/calendar";
 import { formatNumber, formatPlainDate } from "@/lib/format";
 import { localName } from "@/lib/i18n-names";
@@ -99,8 +99,8 @@ export default async function ChildrenPage({
                 </Link>
               </li>
             ) : null}
-            {movingUp ? <li>{t("alertMovingUp", { count: movingUp, n: n(movingUp) })}</li> : null}
-            {leaving ? <li>{t("alertLeaving", { count: leaving, n: n(leaving) })}</li> : null}
+            {movingUp ? <li>{t("alertMovingUp", { count: movingUp, n: n(movingUp), days: n(MOVING_UP_WINDOW_DAYS) })}</li> : null}
+            {leaving ? <li>{t("alertLeaving", { count: leaving, n: n(leaving), days: n(LEAVING_WINDOW_DAYS) })}</li> : null}
           </ul>
         </Card>
       ) : null}

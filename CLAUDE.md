@@ -99,3 +99,16 @@ pnpm test:e2e            # end-to-end (starts the dev server; resets test accoun
 - Settings (users, branches, rooms, age bands, thresholds, audit log) are for the owner and company manager. Branch managers manage holidays for their own branch. Only the owner can grant the owner role; nobody changes their own roles.
 - The weekly working days are organization-wide (default Sunday–Thursday); holidays and extra working days are per branch.
 - Ending a user's access (end date) signs them out everywhere. Password and two-step resets also sign the person out.
+
+## Phase 2 decisions
+
+- Children screens live under `/children` (list, `new`, `[id]`, `waitlist`, `approvals`, `import`). Access is by role grants (`requireChildren`), not only the active role's tabs; owner, company manager and accountant reach them from More.
+- Who sees and edits children is in `drizzle/0004_phase2_children_rls.sql`: viewers = owner, company manager, branch manager, front desk, accountant; editors = branch manager and front desk; imports and their rollback = company manager; teachers see only children with an active enrollment in a room assigned to them (Settings → Users → rooms).
+- Medical notes: branch manager edits, the child's teachers read. Owner and company manager read only through `app_break_glass_medical(student, reason)`, which writes an audit row. Medical text never enters the audit log (stored as a fingerprint).
+- Licence cap (D11) is enforced by a trigger. Past the cap the child is saved as `pending_approval` with an `over_capacity` request; only the owner decides (`app_decide_over_capacity`), and nobody decides their own request.
+- Transfers: the sending branch asks; the receiving branch manager accepts with a room (`app_decide_transfer`). If brothers or sisters stay, the family account and this child's guardians are copied to the new branch.
+- Age rules: enrollment from 3 months to under 54 months (checked for start dates from today); a room of another age band needs a written reason. Past enrollments from imports are not age-checked at the start date.
+- Withdrawal closes the enrollment at once with its last day and reason; refunds of unused days come with Phase 4 (credit notes).
+- Photos and signed forms are stored in the database (`attachment`, up to 5 MB) so they stay with the data in Egypt, served through `/api/attachment/[id]` under RLS.
+- Phone numbers are stored as 11-digit Egyptian mobiles (`normalizePhone`).
+- `pnpm seed:demo` / `pnpm seed:wipe-demo`: made-up children for demo mode (spec §16 figures). E2E tests reset them with `resetChildren()`; children the tests add are named "E2E …".

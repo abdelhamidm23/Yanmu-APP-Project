@@ -15,7 +15,8 @@ function has(tree: Tree, key: string): boolean {
     if (typeof node === "string" || !(part in node)) return false;
     node = node[part];
   }
-  return true;
+  // A key must name a message, not a group of messages (next-intl: INSUFFICIENT_PATH).
+  return typeof node === "string";
 }
 
 function files(dir: string): string[] {

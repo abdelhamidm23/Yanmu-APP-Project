@@ -12,7 +12,7 @@ import { todayInCairo } from "@/lib/calendar";
 import { requireUser } from "@/lib/require-user";
 
 const locale = z.enum(["ar", "en"]).catch("ar");
-const optional = z.string().trim().max(500).transform((v) => v || null);
+const optional = z.string().trim().max(500).optional().transform((v) => v || null);
 const isoDate = z.iso.date();
 
 /** Loads the child's branch (through RLS) and checks the person may edit children there. */

@@ -8,7 +8,7 @@ import { requireUser } from "@/lib/require-user";
 import { isOwner } from "@/lib/permissions";
 
 const locale = z.enum(["ar", "en"]).catch("ar");
-const optional = z.string().trim().max(500).transform((v) => v || null);
+const optional = z.string().trim().max(500).optional().transform((v) => v || null);
 
 async function decide(fd: FormData, work: (userId: string) => Promise<void | { error: string }>) {
   const loc = locale.parse(fd.get("locale"));

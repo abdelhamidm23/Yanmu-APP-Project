@@ -19,7 +19,7 @@ export type NewChildState =
   | { status: "error"; code: string; field?: string };
 
 const name = z.string().trim().min(2).max(120);
-const optional = z.string().trim().max(500).transform((v) => v || null);
+const optional = z.string().trim().max(500).optional().transform((v) => v || null);
 const isoDate = z.iso.date();
 
 const schema = z.object({
