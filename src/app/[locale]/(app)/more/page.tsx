@@ -1,7 +1,8 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { requireSection } from "@/lib/require-user";
-import { canOpenSettings } from "@/lib/permissions";
+import { canOpenSettings, canViewChildren } from "@/lib/permissions";
+import { canOpenSection } from "@/lib/roles";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
 import { Button, buttonClasses } from "@/components/ui/Button";
@@ -56,6 +57,17 @@ export default async function MorePage({
           </div>
         </dl>
       </Card>
+
+      {canViewChildren(user) && !(user.activeRole && canOpenSection(user.activeRole, "children")) ? (
+        <Link
+          href="/children"
+          data-testid="open-children"
+          className="flex min-h-11 flex-col gap-1 rounded-card border border-border bg-surface p-4 hover:bg-bg"
+        >
+          <span className="text-section-title font-semibold">{t("more.children")}</span>
+          <span className="text-[14px] text-muted">{t("more.childrenLink")}</span>
+        </Link>
+      ) : null}
 
       {canOpenSettings(user) ? (
         <Link

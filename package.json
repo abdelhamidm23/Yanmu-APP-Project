@@ -22,7 +22,9 @@
     "test:all": "pnpm lint && pnpm lint:rtl && pnpm typecheck && pnpm test",
     "seed:base": "tsx scripts/seed-base.ts",
     "db:setup": "pnpm db:migrate && pnpm seed:base",
-    "test:db": "vitest run --project db"
+    "test:db": "vitest run --project db",
+    "seed:demo": "tsx scripts/seed-demo.ts",
+    "seed:wipe-demo": "tsx scripts/wipe-demo.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "^5.3.0",

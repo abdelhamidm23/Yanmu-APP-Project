@@ -1,6 +1,6 @@
 import "server-only";
 import { and, desc, eq, sql, type SQL } from "drizzle-orm";
-import { academicYear, ageBand, appUser, auditEvent, branch } from "./schema";
+import { academicYear, ageBand, appUser, auditEvent, branch, room } from "./schema";
 import type { Tx } from "./rls";
 
 export const AUDIT_PAGE_SIZE = 50;
@@ -42,16 +42,18 @@ export { AUDITED_TABLES } from "./audit-tables";
 
 /** id → readable name for branches, age bands, users and academic years, for showing audit changes. */
 export async function auditNames(tx: Tx, locale: "ar" | "en") {
-  const [branches, bands, users, years] = await Promise.all([
+  const [branches, bands, users, years, rooms] = await Promise.all([
     tx.select({ id: branch.id, ar: branch.nameAr, en: branch.nameEn }).from(branch),
     tx.select({ id: ageBand.id, ar: ageBand.nameAr, en: ageBand.nameEn }).from(ageBand),
     tx.select({ id: appUser.id, name: appUser.name }).from(appUser),
     tx.select({ id: academicYear.id, label: academicYear.label }).from(academicYear),
+    tx.select({ id: room.id, ar: room.nameAr, en: room.nameEn }).from(room),
   ]);
   return new Map<string, string>([
     ...branches.map((b) => [b.id, locale === "ar" ? b.ar : b.en] as [string, string]),
     ...bands.map((b) => [b.id, locale === "ar" ? b.ar : b.en] as [string, string]),
     ...users.map((u) => [u.id, u.name] as [string, string]),
     ...years.map((y) => [y.id, y.label] as [string, string]),
+    ...rooms.map((r) => [r.id, locale === "ar" ? r.ar : r.en] as [string, string]),
   ]);
 }

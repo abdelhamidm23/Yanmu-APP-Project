@@ -34,3 +34,41 @@ export async function signInWithNewMfa(page: Page, email: string, locale: "ar" |
   await expect(page).toHaveURL(new RegExp(`/${locale}/home$`));
   return secret;
 }
+
+/**
+ * Children tests: removes children the tests added (names start "E2E"), puts the demo children
+ * back (Branch A 92, Branch B 61, waitlist 9) and the licence back to 100.
+ */
+export async function resetChildren() {
+  const { default: postgres } = await import("postgres");
+  const sql = postgres(process.env.MIGRATION_DATABASE_URL!, { max: 1, onnotice: () => {} });
+  try {
+    const kids = sql`(select id from student where full_name_en like 'E2E %')`;
+    await sql`delete from consent_record where student_id in ${kids}`;
+    await sql`delete from student_medical where student_id in ${kids}`;
+    await sql`delete from student_guardian where student_id in ${kids}`;
+    await sql`delete from enrollment where student_id in ${kids}`;
+    await sql`delete from approval_request where student_id in ${kids}`;
+    await sql`update waitlist_entry set converted_student_id = null where converted_student_id in ${kids}`;
+    await sql`delete from student where full_name_en like 'E2E %'`;
+    await sql`delete from guardian where full_name like 'E2E %' and not exists (select 1 from student_guardian sg where sg.guardian_id = guardian.id)`;
+    await sql`delete from family where display_name like 'E2E %' and not exists (select 1 from student s where s.family_id = family.id)
+              and not exists (select 1 from guardian g where g.family_id = family.id)`;
+    await sql`update branch set licensed_capacity = 100 where code in ('A', 'B')`;
+  } finally {
+    await sql.end();
+  }
+  const { execSync } = await import("node:child_process");
+  execSync("pnpm -s seed:demo --reset", { stdio: "ignore" });
+}
+
+/** Runs one query as the database owner (test setup only). */
+export async function ownerQuery<T extends Record<string, unknown>>(query: (sql: import("postgres").Sql) => Promise<T[]>): Promise<T[]> {
+  const { default: postgres } = await import("postgres");
+  const sql = postgres(process.env.MIGRATION_DATABASE_URL!, { max: 1, onnotice: () => {} });
+  try {
+    return await query(sql);
+  } finally {
+    await sql.end();
+  }
+}

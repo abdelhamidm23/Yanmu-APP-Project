@@ -3,17 +3,17 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { z } from "zod";
 import { withUserDb } from "@/db/rls";
-import { appUser, branch, userBranchRole } from "@/db/schema";
+import { ageBand, appUser, branch, room, userBranchRole, userRoom } from "@/db/schema";
 import { requireSettings } from "@/lib/require-user";
 import { isOwner } from "@/lib/permissions";
 import { localName } from "@/lib/i18n-names";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { PageHeader } from "@/components/settings/Fields";
+import { CheckField, PageHeader } from "@/components/settings/Fields";
 import { ResultBanner } from "@/components/settings/ResultBanner";
 import { GrantGrid } from "../GrantGrid";
 import { UserDetailsFields } from "../UserDetailsFields";
-import { resetMfa, updateUser } from "../actions";
+import { resetMfa, saveTeacherRooms, updateUser } from "../actions";
 import { ResetPasswordForm } from "./ResetPasswordForm";
 
 export default async function EditUserPage({
@@ -34,11 +34,22 @@ export default async function EditUserPage({
       u,
       grants: await tx.select().from(userBranchRole).where(eq(userBranchRole.userId, id)),
       branches: await tx.select().from(branch).orderBy(asc(branch.code)),
+      rooms: await tx
+        .select({ id: room.id, nameAr: room.nameAr, nameEn: room.nameEn, branchId: room.branchId, band: ageBand.sort })
+        .from(room)
+        .innerJoin(ageBand, eq(ageBand.id, room.ageBandId))
+        .where(eq(room.isActive, true))
+        .orderBy(asc(ageBand.sort), asc(room.nameEn)),
+      assigned: await tx.select({ roomId: userRoom.roomId }).from(userRoom).where(eq(userRoom.userId, id)),
     };
   });
   if (!data) notFound();
-  const { u, grants, branches } = data;
+  const { u, grants, branches, rooms, assigned } = data;
   const isSelf = u.id === me.id;
+  // Teachers: pick the rooms they look after, in the branches where they teach.
+  const teacherBranches = grants.filter((g) => g.role === "teacher").map((g) => g.branchId);
+  const teacherRooms = rooms.filter((r) => teacherBranches.includes(null) || teacherBranches.includes(r.branchId));
+  const assignedIds = new Set(assigned.map((a) => a.roomId));
 
   return (
     <div className="flex flex-col gap-4">
@@ -61,6 +72,32 @@ export default async function EditUserPage({
           </Button>
         </form>
       </Card>
+
+      {teacherRooms.length > 0 ? (
+        <Card>
+          <form action={saveTeacherRooms} className="flex flex-col gap-3" data-testid="teacher-rooms">
+            <input type="hidden" name="locale" value={locale} />
+            <input type="hidden" name="id" value={u.id} />
+            <h2 className="text-section-title font-semibold">{t("users.teacherRooms")}</h2>
+            <p className="text-meta text-muted">{t("users.teacherRoomsHelp")}</p>
+            {branches
+              .filter((b) => teacherRooms.some((r) => r.branchId === b.id))
+              .map((b) => (
+                <fieldset key={b.id} className="flex flex-col">
+                  <legend className="font-medium">{localName(b, locale)}</legend>
+                  {teacherRooms
+                    .filter((r) => r.branchId === b.id)
+                    .map((r) => (
+                      <CheckField key={r.id} name="roomIds" value={r.id} label={localName(r, locale)} defaultChecked={assignedIds.has(r.id)} />
+                    ))}
+                </fieldset>
+              ))}
+            <Button type="submit" variant="secondary" className="self-start">
+              {t("common.save")}
+            </Button>
+          </form>
+        </Card>
+      ) : null}
 
       {!isSelf ? (
         <Card className="flex flex-col gap-4">

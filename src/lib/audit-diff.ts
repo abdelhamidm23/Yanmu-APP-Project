@@ -1,6 +1,6 @@
 /** Turns an audit row's before/after into a short list of field changes for people to read. */
 const HIDDEN = new Set(["id", "org_id", "created_at", "created_by", "updated_at", "updated_by"]);
-const SUMMARY = ["name_en", "name_ar", "full_name", "name", "code", "key", "date", "role", "user_id", "branch_id", "email", "note"];
+const SUMMARY = ["name_en", "name_ar", "full_name", "full_name_en", "student_no", "display_name", "account_no", "student_name", "name", "code", "key", "date", "role", "user_id", "branch_id", "email", "type", "status", "purpose", "start_date", "file_name", "note"];
 
 export interface FieldChange {
   field: string;

@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { hashPassword } from "better-auth/crypto";
 import { withUserDb, dbErrorCode } from "@/db/rls";
-import { appUser, authAccount, authSession, authTwoFactor, userBranchRole } from "@/db/schema";
+import { appUser, authAccount, authSession, authTwoFactor, room, userBranchRole, userRoom } from "@/db/schema";
 import { runAndReturn } from "@/lib/action-result";
 import { requireSettings } from "@/lib/require-user";
 import { isOwner } from "@/lib/permissions";
@@ -124,5 +124,26 @@ export async function resetMfa(fd: FormData) {
       },
       { reason: "two-step sign-in reset by manager" },
     );
+  });
+}
+
+/** Rooms a teacher looks after (spec §5 "room" scope): they see only those children. */
+export async function saveTeacherRooms(fd: FormData) {
+  const locale = loc(fd);
+  const user = await requireSettings(locale);
+  const id = z.uuid().parse(fd.get("id"));
+  const rooms = z.array(z.uuid()).parse(fd.getAll("roomIds"));
+  await runAndReturn(locale, `/settings/users/${id}`, async () => {
+    await withUserDb(user.id, async (tx) => {
+      const current = await tx.select({ roomId: userRoom.roomId }).from(userRoom).where(eq(userRoom.userId, id));
+      const keep = new Set(rooms);
+      for (const r of current) if (!keep.has(r.roomId)) await tx.delete(userRoom).where(and(eq(userRoom.userId, id), eq(userRoom.roomId, r.roomId)));
+      const have = new Set(current.map((r) => r.roomId));
+      for (const roomId of rooms) {
+        if (have.has(roomId)) continue;
+        const [r] = await tx.select({ branchId: room.branchId }).from(room).where(eq(room.id, roomId));
+        if (r) await tx.insert(userRoom).values({ userId: id, roomId, branchId: r.branchId });
+      }
+    });
   });
 }
