@@ -142,11 +142,15 @@ test("QR pickup card: the branch manager makes one, the teacher scans it and han
   await result.locator(`[data-child="${kid.name}"]`).getByTestId("qr-hand-over").click();
   await expect(page.getByTestId("gone-list")).toContainText(`${kid.name}`);
   await expect(page.getByTestId("gone-list")).toContainText("QR card");
-  await expect(page.getByTestId("sync-status")).toHaveText("Everything is saved.");
-  const [day] = await ownerQuery(
-    (sql) => sql`select check_out_method from student_attendance where student_id = ${kid.id as string} and date = ${today}`,
-  );
-  expect(day.check_out_method).toBe("qr");
+  // The tap is saved on the phone first and sent a moment later.
+  await expect
+    .poll(async () => {
+      const [day] = await ownerQuery(
+        (sql) => sql`select check_out_method from student_attendance where student_id = ${kid.id as string} and date = ${today}`,
+      );
+      return day?.check_out_method;
+    })
+    .toBe("qr");
 
   // A wrong code is refused with a clear warning.
   await page.getByTestId("scan-card").click();
