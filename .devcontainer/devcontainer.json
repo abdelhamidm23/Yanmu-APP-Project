@@ -1,0 +1,29 @@
+// Online demo in GitHub Codespaces: free with any GitHub account, no card, nothing to install.
+// Open https://codespaces.new/abdelhamidm23/Yanmu-APP-Project and wait for the app to open.
+// Made-up data only: never enter real children, families or staff here (CLAUDE.md rule 10).
+{
+  "name": "Nursery Command Center demo",
+  "dockerComposeFile": "compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": { "label": "Nursery app", "onAutoForward": "openBrowser" },
+    "5432": { "label": "Database", "onAutoForward": "silent" }
+  },
+  "otherPortsAttributes": { "onAutoForward": "silent" },
+  // Once, when the codespace is made: install and build the app.
+  "postCreateCommand": "bash .devcontainer/build-demo.sh",
+  // Every time the codespace starts: fresh demo accounts, today's demo attendance, then the app.
+  "postStartCommand": "bash .devcontainer/start-demo.sh",
+  // Every time the window opens or reloads: start the demo again if it stopped.
+  "postAttachCommand": "bash .devcontainer/ensure-demo.sh",
+  "customizations": {
+    "codespaces": { "openFiles": [".devcontainer/README.md"] },
+    "vscode": { "settings": { "workbench.startupEditor": "none", "telemetry.telemetryLevel": "off" } }
+  }
+}

@@ -1,0 +1,26 @@
+# The demo codespace: the app container shares the network of a throwaway Postgres,
+# so the database is at localhost:5432. Made-up data only.
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/javascript-node:22-bookworm
+    volumes:
+      - ../..:/workspaces:cached
+    command: sleep infinity
+    network_mode: service:db
+    environment:
+      DEMO_MODE: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  db:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: yanmu
+      POSTGRES_PASSWORD: yanmu
+      POSTGRES_DB: yanmu
+      TZ: UTC
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
