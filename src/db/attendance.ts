@@ -6,6 +6,7 @@ import {
   enrollment,
   guardian,
   importBatch,
+  pickupCard,
   pickupRefusal,
   ratioSnapshot,
   room,
@@ -21,7 +22,7 @@ import {
 import type { Tx } from "./rls";
 import type { CurrentUser } from "@/lib/session";
 import { ATTENDANCE_EDIT_ROLES, hasRoleIn } from "@/lib/permissions";
-import { attendanceSummary, carerPresence, effectiveRoster, roomRatio, type AttendanceStatus } from "@/lib/attendance";
+import { attendanceSummary, carerPresence, effectiveRoster, roomRatio, type AttendanceStatus, type DayRecord } from "@/lib/attendance";
 
 /** Rooms this person takes roll call for: every room of their branches (manager, front desk) or their assigned rooms (teacher). */
 export async function attendanceRooms(tx: Tx, user: Pick<CurrentUser, "id" | "grants">) {
@@ -73,6 +74,7 @@ export async function roomDay(tx: Tx, roomId: string, date: string, opts: { medi
       checkInAt: studentAttendance.checkInAt,
       checkOutAt: studentAttendance.checkOutAt,
       collectedBy: studentAttendance.collectedByGuardianId,
+      checkOutVia: studentAttendance.checkOutMethod,
       clientAt: studentAttendance.clientAt,
     })
     .from(enrollment)
@@ -97,6 +99,15 @@ export async function roomDay(tx: Tx, roomId: string, date: string, opts: { medi
         .where(inArray(studentGuardian.studentId, ids))
         .orderBy(desc(studentGuardian.isPrimaryContact), asc(guardian.fullName))
     : [];
+  // QR pickup cards in use for these adults: only the hash of each card's code (src/lib/pickup-card.ts).
+  const adultIds = [...new Set(adults.map((a) => a.id))];
+  const cards = adultIds.length
+    ? await tx
+        .select({ guardianId: pickupCard.guardianId, hash: pickupCard.tokenHash })
+        .from(pickupCard)
+        .where(and(inArray(pickupCard.guardianId, adultIds), isNull(pickupCard.revokedAt)))
+    : [];
+  const cardBy = new Map(cards.map((c) => [c.guardianId, c.hash]));
   const medical =
     opts.medical && ids.length
       ? await tx
@@ -121,9 +132,10 @@ export async function roomDay(tx: Tx, roomId: string, date: string, opts: { medi
           checkInAt: k.checkInAt?.toISOString() ?? null,
           checkOutAt: k.checkOutAt?.toISOString() ?? null,
           collectedByGuardianId: k.collectedBy,
+          checkOutVia: (k.checkOutVia as DayRecord["checkOutVia"]) ?? null,
           clientAt: k.clientAt?.toISOString() ?? null,
         },
-        pickup: adults.filter((a) => a.studentId === k.id && a.canPickUp).map(({ id, fullName, relationship, photoId }) => ({ id, fullName, relationship, photoId })),
+        pickup: adults.filter((a) => a.studentId === k.id && a.canPickUp).map(({ id, fullName, relationship, photoId }) => ({ id, fullName, relationship, photoId, cardHash: cardBy.get(id) ?? null })),
         medical: m && (m.allergies || m.conditions || m.medications) ? { allergies: m.allergies, conditions: m.conditions, medications: m.medications } : null,
       };
     }),

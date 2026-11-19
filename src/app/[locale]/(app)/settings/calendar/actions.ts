@@ -6,7 +6,7 @@ import { academicYear, calendarDay, organization, term } from "@/db/schema";
 import { writeOrgSetting } from "@/db/settings";
 import { runAndReturn } from "@/lib/action-result";
 import { requireSettings } from "@/lib/require-user";
-import { WEEKDAYS } from "@/lib/settings";
+import { WEEKDAYS, parseSettingInput } from "@/lib/settings";
 
 const loc = (fd: FormData) => z.enum(["ar", "en"]).catch("ar").parse(fd.get("locale"));
 const PATH = "/settings/calendar";
@@ -17,6 +17,22 @@ export async function saveWorkingDays(fd: FormData) {
   await runAndReturn(locale, PATH, async () => {
     const days = z.array(z.enum(WEEKDAYS)).min(1).parse(fd.getAll("days"));
     await withUserDb(user.id, (tx) => writeOrgSetting(tx, "calendar.working_days", WEEKDAYS.filter((d) => days.includes(d))));
+  });
+}
+
+/** Opening hours (owner's review): opening time, end of the school day and the after-school time. */
+export async function saveHours(fd: FormData) {
+  const locale = loc(fd);
+  const user = await requireSettings(locale);
+  await runAndReturn(locale, PATH, async () => {
+    const values = (["attendance.opening_time", "attendance.closing_time", "attendance.after_school_minutes"] as const).map(
+      (key) => [key, parseSettingInput(key, String(fd.get(key) ?? ""))] as const,
+    );
+    const [open, close] = [String(values[0][1]), String(values[1][1])];
+    if (open >= close) return { error: "invalid" };
+    await withUserDb(user.id, async (tx) => {
+      for (const [key, value] of values) await writeOrgSetting(tx, key, value);
+    });
   });
 }
 

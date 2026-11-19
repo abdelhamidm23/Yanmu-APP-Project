@@ -43,7 +43,7 @@ export default async function MyRoomPage({ params, searchParams }: { params: Pro
           {mine.map((r) => (
             <Link
               key={r.id}
-              href={`/my-room?room=${r.id}`}
+              href={`/my-class?room=${r.id}`}
               aria-current={r.id === room.id ? "page" : undefined}
               className={`inline-flex min-h-11 items-center rounded-button px-4 text-[14px] font-medium ${r.id === room.id ? "bg-brand text-white" : "border border-outline bg-surface"}`}
             >

@@ -707,6 +707,8 @@ export const studentAttendance = pgTable(
     checkInAt: timestamp("check_in_at", { withTimezone: true }),
     checkOutAt: timestamp("check_out_at", { withTimezone: true }),
     collectedByGuardianId: uuid("collected_by_guardian_id").references(() => guardian.id),
+    /** How the adult was checked: picked from the approved list, or by scanning their QR pickup card. */
+    checkOutMethod: text("check_out_method"),
     /** The last tap applied (offline idempotency, spec §8.2). */
     clientUuid: uuid("client_uuid"),
     clientAt: timestamp("client_at", { withTimezone: true }),
@@ -717,6 +719,7 @@ export const studentAttendance = pgTable(
     unique("student_attendance_day_unique").on(t.studentId, t.date),
     index("student_attendance_branch_date_idx").on(t.branchId, t.date),
     check("student_attendance_status_check", sql`${t.status} IN ('present', 'absent', 'excused')`),
+    check("student_attendance_check_out_method_check", sql`${t.checkOutMethod} IN ('list', 'qr')`),
   ],
 );
 
@@ -741,6 +744,32 @@ export const pickupRefusal = pgTable(
     ...tracked,
   },
   (t) => [index("pickup_refusal_branch_idx").on(t.branchId, t.happenedAt)],
+);
+
+/**
+ * A QR pickup card for one approved adult (owner's review of phase 3). The card holds a random code;
+ * only its SHA-256 is stored. One card in use per adult: a new card cancels the old one.
+ */
+export const pickupCard = pgTable(
+  "pickup_card",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    guardianId: uuid("guardian_id")
+      .notNull()
+      .references(() => guardian.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedBy: uuid("revoked_by").references(() => appUser.id),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    uniqueIndex("pickup_card_one_active_per_guardian").on(t.guardianId).where(sql`${t.revokedAt} IS NULL`),
+    index("pickup_card_branch_idx").on(t.branchId),
+  ],
 );
 
 /** One fingerprint punch from the device export (spec §8.3). */

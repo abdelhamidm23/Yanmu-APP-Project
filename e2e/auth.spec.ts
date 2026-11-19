@@ -43,9 +43,9 @@ test.describe("sign-in", () => {
     await expect(page).toHaveURL(/\/en\/login$/);
   });
 
-  test("teacher signs in (no MFA needed) and lands on My room", async ({ page }) => {
+  test("teacher signs in (no MFA needed) and lands on My class", async ({ page }) => {
     await signIn(page, "teacher@yanmu.test", "ar");
-    await expect(page).toHaveURL(/\/ar\/my-room$/);
+    await expect(page).toHaveURL(/\/ar\/my-class$/);
     await expect(page.getByRole("heading", { name: "فصلي" })).toBeVisible();
     await expect(page.getByTestId("active-role")).toHaveText("المعلمة");
   });

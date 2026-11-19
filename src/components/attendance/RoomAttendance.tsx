@@ -6,12 +6,16 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { applyEvent, attendanceSummary, type AttendanceEvent, type AttendanceStatus, type DayRecord } from "@/lib/attendance";
 import { enqueue, flush, loadRoom, newUuid, queued, saveRoom } from "@/lib/offline-queue";
+import { hashPickupCode, parsePickupQr } from "@/lib/pickup-card";
+import { QrScanner } from "./QrScanner";
 
 export interface PickupAdult {
   id: string;
   fullName: string;
   relationship: string;
   photoId: string | null;
+  /** SHA-256 of the adult's QR pickup card in use, if they have one. */
+  cardHash: string | null;
 }
 
 export interface AttendanceChild {
@@ -96,6 +100,9 @@ export function RoomAttendance({
   const [refusalName, setRefusalName] = useState("");
   const [refusalNote, setRefusalNote] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  /** The adult whose QR card was just scanned, or "unknown" for a card this class does not recognise. */
+  const [scanned, setScanned] = useState<PickupAdult | "unknown" | null>(null);
   const namesRef = useRef(new Map<string, string>());
   /** Which child each tap was for, to name the child if the server refuses it. */
   const tapsRef = useRef(new Map<string, string>());
@@ -204,6 +211,26 @@ export function RoomAttendance({
     setNotice(t("checkedOut", { child: child.name, adult: adult?.fullName ?? "" }));
     setCheckingOut(null);
     setChosenAdult(null);
+  }
+
+  async function onScan(text: string) {
+    setScanning(false);
+    setNotice(null);
+    const code = parsePickupQr(text);
+    const hash = code ? await hashPickupCode(code) : null;
+    const adult = hash ? kids.flatMap((k) => k.pickup).find((a) => a.cardHash === hash) : undefined;
+    setScanned(adult ?? "unknown");
+  }
+
+  /** Children in the class now whom the scanned adult may collect. */
+  const qrChildren = scanned && scanned !== "unknown" ? inRoom.filter((k) => k.pickup.some((a) => a.id === scanned.id)) : [];
+
+  function handOverQr(list: AttendanceChild[]) {
+    if (!scanned || scanned === "unknown") return;
+    const at = stamps(list.length);
+    list.forEach((k, i) => void tap({ kind: "checkout", clientUuid: newUuid(), at: at[i], studentId: k.id, date, guardianId: scanned.id, via: "qr" }));
+    setNotice(list.map((k) => t("checkedOut", { child: k.name, adult: scanned.fullName })).join(" "));
+    if (list.length === qrChildren.length) setScanned(null);
   }
 
   function recordRefusal() {
@@ -394,6 +421,66 @@ export function RoomAttendance({
               </Button>
             </Card>
           ) : null}
+          {scanning ? (
+            <Card>
+              <QrScanner onResult={(text) => void onScan(text)} onClose={() => setScanning(false)} />
+            </Card>
+          ) : (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setScanning(true);
+                setScanned(null);
+                setCheckingOut(null);
+              }}
+              data-testid="scan-card"
+            >
+              {t("scanCard")}
+            </Button>
+          )}
+          {scanned === "unknown" ? (
+            <div role="alert" className="flex flex-col gap-2 rounded-card border border-critical bg-surface p-4" data-testid="qr-unknown">
+              <p className="font-semibold text-critical">{t("qrUnknown")}</p>
+              <Button variant="secondary" onClick={() => setScanned(null)}>
+                {t("cancel")}
+              </Button>
+            </div>
+          ) : scanned ? (
+            <Card className="flex flex-col gap-3 border-good" data-testid="qr-result">
+              <div className="flex items-center gap-3">
+                <Avatar photoId={scanned.photoId} name={scanned.fullName} size={72} />
+                <span className="flex flex-col">
+                  <span className="text-meta text-good">{t("qrValid")}</span>
+                  <span className="text-row-title font-semibold">{scanned.fullName}</span>
+                  <span className="text-meta text-muted">{t(`relationship.${scanned.relationship}` as "relationship.other")}</span>
+                </span>
+              </div>
+              <p className="text-[14px]">{t("qrCheckFace")}</p>
+              {qrChildren.length === 0 ? (
+                <p className="text-muted" data-testid="qr-none-here">{t("qrNoneHere")}</p>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {qrChildren.map((k) => (
+                    <li key={k.id} className="flex items-center gap-3 rounded-button border border-border p-2" data-child={k.name}>
+                      <Avatar photoId={k.photoId} name={k.name} />
+                      <span className="flex-1 font-semibold">{k.name}</span>
+                      <Button onClick={() => handOverQr([k])} data-testid="qr-hand-over">
+                        {t("handOver")}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {qrChildren.length > 1 ? (
+                <Button onClick={() => handOverQr(qrChildren)} data-testid="qr-hand-over-all">
+                  {t("handOverAll", { count: qrChildren.length })}
+                </Button>
+              ) : null}
+              <Button variant="secondary" onClick={() => setScanned(null)}>
+                {t("cancel")}
+              </Button>
+            </Card>
+          ) : null}
           <h2 className="text-section-title font-semibold">{t("inRoom", { count: inRoom.length })}</h2>
           {inRoom.length === 0 ? <p className="text-muted">{t("nobodyIn")}</p> : null}
           <ul className="flex flex-col gap-2" data-testid="pickup-list">
@@ -425,7 +512,8 @@ export function RoomAttendance({
                   return (
                     <li key={k.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-[14px]">
                       <span className="font-medium">{k.name}</span>
-                      <span className="figure text-muted">{t("collectedBy", { adult: adult?.fullName ?? "—", time: time(k.day.checkOutAt, locale) })}</span>
+                      <span className="figure text-muted">{t("collectedBy", { adult: adult?.fullName ?? "—", time: time(k.day.checkOutAt, locale) })}
+                        {k.day.checkOutVia === "qr" ? ` · ${t("viaQr")}` : ""}</span>
                     </li>
                   );
                 })}

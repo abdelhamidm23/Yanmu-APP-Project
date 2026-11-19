@@ -6,15 +6,30 @@ import { expectDirection, signIn, signInWithNewMfa } from "./helpers";
 const stamp = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`;
 
 test.describe("settings (Phase 1)", () => {
-  test("company manager adds a room and a user, and sees both in the audit log", async ({ page }) => {
+  test("company manager adds a class and a user, and sees both in the audit log", async ({ page }) => {
     execSync("pnpm -s seed:dev-users --reset", { stdio: "ignore" });
     await signInWithNewMfa(page, "company.manager@yanmu.test", "en");
 
+    // More lists the settings in their own groups (owner's review): setup, people, records.
     await page.getByTestId("nav-more").click();
-    await page.getByTestId("open-settings").click();
-    await expect(page).toHaveURL(/\/en\/settings$/);
+    await expect(page.getByTestId("settings-group-setup")).toContainText("Branches and classes");
+    await expect(page.getByTestId("settings-group-setup")).toContainText("Calendar and hours");
+    await expect(page.getByTestId("settings-group-people")).toContainText("Users and roles");
+    await expect(page.getByTestId("settings-group-records")).toContainText("Audit log");
 
-    // Add a room to Yanmu.
+    // Opening hours: 8 to 4, with the after-school time to 5 PM.
+    await page.getByTestId("settings-calendar").click();
+    await expect(page.getByTestId("hours-summary")).toHaveText("Open 08:00 to 16:00, after-school until 17:00.");
+    await page.locator("#h-after").fill("45");
+    await page.getByTestId("save-hours").click();
+    await expect(page.locator("main [role=status]")).toHaveText("Saved.");
+    await expect(page.getByTestId("hours-summary")).toHaveText("Open 08:00 to 16:00, after-school until 16:45.");
+    await page.locator("#h-after").fill("60");
+    await page.getByTestId("save-hours").click();
+    await expect(page.getByTestId("hours-summary")).toHaveText("Open 08:00 to 16:00, after-school until 17:00.");
+
+    // Add a class to Yanmu.
+    await page.goto("/en/more");
     const roomName = `Sunflower ${stamp()}`;
     await page.getByTestId("settings-branches").click();
     await page.getByTestId("branch-list").getByRole("link", { name: /Yanmu/ }).click();
@@ -72,6 +87,9 @@ test.describe("settings (Phase 1)", () => {
     await form.locator("#ex-note").fill(note);
     await form.getByRole("button").click();
     await expect(page.getByTestId("exception-list")).toContainText(note);
+    // The branch manager sees the opening hours but cannot change them.
+    await expect(page.getByTestId("hours-summary")).toContainText("after-school until");
+    await expect(page.getByTestId("save-hours")).toHaveCount(0);
 
     // Branch-only screens are not there for a branch manager.
     expect((await page.goto("/en/settings/branches"))?.status()).toBe(404);
@@ -88,10 +106,11 @@ test.describe("settings (Phase 1)", () => {
 
   test("teacher has no settings", async ({ page }) => {
     await signIn(page, "teacher@yanmu.test", "en");
-    await expect(page).toHaveURL(/\/en\/my-room$/);
+    await expect(page).toHaveURL(/\/en\/my-class$/);
     expect((await page.goto("/en/settings"))?.status()).toBe(404);
     expect((await page.goto("/en/settings/calendar"))?.status()).toBe(404);
     await page.goto("/en/more");
-    await expect(page.getByTestId("open-settings")).toHaveCount(0);
+    await expect(page.getByTestId("settings-group-setup")).toHaveCount(0);
+    await expect(page.getByTestId("settings-calendar")).toHaveCount(0);
   });
 });

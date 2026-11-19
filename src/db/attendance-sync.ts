@@ -1,6 +1,6 @@
 import "server-only";
-import { and, eq, sql } from "drizzle-orm";
-import { pickupRefusal, studentAttendance } from "./schema";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { pickupCard, pickupRefusal, studentAttendance } from "./schema";
 import { dbErrorCode, dbRuleCode, type Tx } from "./rls";
 import { addDays } from "@/lib/children";
 import { todayInCairo } from "@/lib/calendar";
@@ -49,9 +49,18 @@ export async function applyAttendanceEvents(tx: Tx, events: AttendanceEvent[]) {
               checkInAt: row.checkInAt?.toISOString() ?? null,
               checkOutAt: row.checkOutAt?.toISOString() ?? null,
               collectedByGuardianId: row.collectedByGuardianId,
+              checkOutVia: (row.checkOutMethod as DayRecord["checkOutVia"]) ?? null,
               clientAt: row.clientAt?.toISOString() ?? null,
             }
           : EMPTY_DAY;
+        // A QR check-out needs the adult's card to be still in use (a phone may hold an old list).
+        if (ev.kind === "checkout" && ev.via === "qr") {
+          const [card] = await sp
+            .select({ id: pickupCard.id })
+            .from(pickupCard)
+            .where(and(eq(pickupCard.guardianId, ev.guardianId), isNull(pickupCard.revokedAt)));
+          if (!card) return { result: "rejected" as const, code: "card_cancelled" };
+        }
         const next = applyEvent(before, ev);
         if ("error" in next) return { result: "rejected" as const, code: next.error };
         if (next.result === "stale") return { result: "stale" as const };
@@ -62,6 +71,7 @@ export async function applyAttendanceEvents(tx: Tx, events: AttendanceEvent[]) {
           checkInAt: next.day.checkInAt ? new Date(next.day.checkInAt) : null,
           checkOutAt: next.day.checkOutAt ? new Date(next.day.checkOutAt) : null,
           collectedByGuardianId: next.day.collectedByGuardianId,
+          checkOutMethod: next.day.checkOutAt ? (next.day.checkOutVia ?? "list") : null,
           clientUuid: ev.clientUuid,
           clientAt: new Date(ev.at),
         };

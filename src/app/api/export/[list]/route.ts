@@ -194,7 +194,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
       { header: t("settings.rooms.capacity"), width: 12 },
       { header: t("settings.users.status"), width: 14 },
     ];
-    return xlsxResponse(await buildWorkbook(localName(data.b, locale), cols, rows, locale), `rooms-${data.b.code}-${stamp}.xlsx`);
+    return xlsxResponse(await buildWorkbook(localName(data.b, locale), cols, rows, locale), `classes-${data.b.code}-${stamp}.xlsx`);
   }
 
   if (list === "audit") {

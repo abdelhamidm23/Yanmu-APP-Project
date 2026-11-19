@@ -4,10 +4,10 @@ import { expectDirection, signIn } from "./helpers";
 
 test("teacher sees the teacher tabs in Arabic", async ({ page }) => {
   await signIn(page, "teacher@yanmu.test", "ar");
-  await expect(page).toHaveURL(/\/ar\/my-room$/);
+  await expect(page).toHaveURL(/\/ar\/my-class$/);
   const nav = page.getByRole("navigation", { name: "التنقل الرئيسي" });
   await expect(nav.getByRole("link")).toHaveText(["فصلي", "تسجيل الحضور", "حادث", "المزيد"]);
-  await expect(page.getByTestId("nav-my-room")).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("nav-my-class")).toHaveAttribute("aria-current", "page");
 });
 
 test("branch manager sees the branch manager tabs and the + Add sheet", async ({ page }) => {
@@ -25,7 +25,7 @@ test("branch manager sees the branch manager tabs and the + Add sheet", async ({
 
 test("the server refuses screens outside your role (not just hidden tabs)", async ({ page }) => {
   await signIn(page, "teacher@yanmu.test", "en");
-  await expect(page).toHaveURL(/\/en\/my-room$/);
+  await expect(page).toHaveURL(/\/en\/my-class$/);
   for (const path of ["/en/inbox", "/en/home", "/en/month-close", "/en/cash-box"]) {
     const response = await page.goto(path);
     expect(response?.status(), path).toBe(404);
@@ -48,7 +48,7 @@ test("a person with two roles can switch between them", async ({ page }) => {
   await expect(page).toHaveURL(/\/en\/today$/);
   await page.getByTestId("nav-more").click();
   await page.getByRole("button", { name: "Teacher" }).click();
-  await expect(page).toHaveURL(/\/en\/my-room$/);
+  await expect(page).toHaveURL(/\/en\/my-class$/);
   await expect(page.getByTestId("active-role")).toHaveText("Teacher");
 });
 

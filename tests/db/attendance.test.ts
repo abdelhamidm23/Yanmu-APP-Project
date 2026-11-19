@@ -22,7 +22,7 @@ let roomB: string;
 const users: Record<string, string> = {};
 const A = { student: "", mum: "", stranger: "", staff: "" };
 const A2 = { student: "" };
-const B = { student: "", mum: "", staff: "", punch: "", batch: "" };
+const B = { student: "", mum: "", staff: "", punch: "", batch: "", card: "" };
 
 async function makeUser(label: string, grants: [Role, string | null][]) {
   const [u] = await owner`insert into app_user (full_name, email) values (${label}, ${`${label}.${run}@test.invalid`}) returning id`;
@@ -102,6 +102,7 @@ beforeAll(async () => {
   await owner`insert into student_attendance (branch_id, room_id, student_id, date, status) values (${branchB}, ${roomB}, ${B.student}, ${today}, 'present')`;
   await owner`insert into pickup_refusal (branch_id, student_id, person_name, happened_at) values (${branchB}, ${B.student}, 'Someone', now())`;
   await owner`insert into import_mapping (branch_id, kind, mapping) values (${branchB}, 'staff_punches', '{"employeeNo":"ID"}')`;
+  [{ id: B.card }] = await owner`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchB}, ${B.mum}, ${`hash-${run}-B`}) returning id`;
   await owner`insert into ratio_snapshot (branch_id, room_id, children_present, carers_present, required_carers, is_breach, reason)
               values (${branchB}, ${roomB}, 1, 1, 1, false, 'test')`;
 });
@@ -116,7 +117,7 @@ describe.each(ROLES.map((r) => [r] as const))("%s in Branch A cannot reach Branc
 
   it("reads nothing of Branch B", async () => {
     await as(me(), async (tx) => {
-      for (const table of ["staff", "room_roster", "student_attendance", "pickup_refusal", "staff_punch", "staff_attendance_day", "import_mapping", "ratio_snapshot"]) {
+      for (const table of ["staff", "room_roster", "student_attendance", "pickup_refusal", "staff_punch", "staff_attendance_day", "import_mapping", "ratio_snapshot", "pickup_card"]) {
         expect(await tx`select 1 from ${tx(table)} where branch_id = ${branchB}`, table).toHaveLength(0);
       }
       expect(await tx`select 1 from import_batch where id = ${B.batch}`).toHaveLength(0);
@@ -137,6 +138,10 @@ describe.each(ROLES.map((r) => [r] as const))("%s in Branch A cannot reach Branc
       expect((await tx`update staff set job_title = 'x' where id = ${B.staff}`).count).toBe(0);
       expect((await tx`delete from staff_punch where id = ${B.punch}`).count).toBe(0);
       expect((await tx`delete from staff_attendance_day where branch_id = ${branchB}`).count).toBe(0);
+      await expectError(tx, (sp) => sp`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchB}, ${B.mum}, ${`x-${run}-${role}`})`, denied);
+      // The card's branch comes from the adult, so naming your own branch does not help either.
+      await expectError(tx, (sp) => sp`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${B.mum}, ${`y-${run}-${role}`})`, denied);
+      expect((await tx`update pickup_card set revoked_at = now() where id = ${B.card}`).count).toBe(0);
     });
   });
 });
@@ -318,6 +323,69 @@ describe("staff, roster and fingerprint files (spec §8.3)", () => {
       await tx`select app_take_ratio_snapshot(${roomA}, 'roll_call')`;
       expect(await tx`select 1 from ratio_snapshot where room_id = ${roomA}`).toHaveLength(0);
       await expectError(tx, (sp) => sp`select app_take_ratio_snapshot(${roomA2}, 'roll_call')`, denied);
+    });
+  });
+});
+
+describe("QR pickup cards (owner's review of phase 3)", () => {
+  it("front desk and the branch manager make and cancel cards; teachers and accountants only read them", async () => {
+    await as(users.front_deskA, async (tx) => {
+      const [c] = await tx`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchB}, ${A.mum}, ${`fd-${run}`}) returning id, branch_id`;
+      expect(c.branch_id).toBe(branchA);
+      expect((await tx`update pickup_card set revoked_at = now() where id = ${c.id}`).count).toBe(1);
+      const [after] = await tx`select revoked_by from pickup_card where id = ${c.id}`;
+      expect(after.revoked_by).toBe(users.front_deskA);
+    });
+    for (const who of ["teacherA", "accountantA", "hrA"]) {
+      await as(users[who], async (tx) => {
+        await expectError(tx, (sp) => sp`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${A.mum}, ${`${who}-${run}`})`, denied);
+      });
+    }
+  });
+
+  it("one card in use per adult; the code and the adult never change, and a cancelled card stays cancelled", async () => {
+    await as(users.branch_managerA, async (tx) => {
+      const [c] = await tx`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${A.mum}, ${`bm-${run}`}) returning id`;
+      await expectError(tx, (sp) => sp`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${A.mum}, ${`bm2-${run}`})`, { code: "23505" });
+      await expectError(tx, (sp) => sp`update pickup_card set token_hash = 'other' where id = ${c.id}`, { code: "23514" });
+      await expectError(tx, (sp) => sp`update pickup_card set guardian_id = ${A.stranger} where id = ${c.id}`, { code: "23514" });
+      await tx`update pickup_card set revoked_at = now() where id = ${c.id}`;
+      await expectError(tx, (sp) => sp`update pickup_card set revoked_at = null where id = ${c.id}`, { code: "23514" });
+      expect((await tx`delete from pickup_card where id = ${c.id}`.catch(() => ({ count: -1 }))).count).not.toBe(1);
+    });
+  });
+
+  it("a teacher sees cards only for adults of children in their classes", async () => {
+    const [{ id: a2mum }] = await owner`select sg.guardian_id as id from student_guardian sg where sg.student_id = ${A2.student} and sg.can_pick_up`;
+    await owner`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${A.mum}, ${`t1-${run}`})`;
+    await owner`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${a2mum}, ${`t2-${run}`})`;
+    await as(users.teacherA, async (tx) => {
+      const rows = await tx`select token_hash from pickup_card where branch_id = ${branchA}`;
+      expect(rows.map((r) => r.token_hash)).toEqual([`t1-${run}`]);
+    });
+    await owner`delete from pickup_card where token_hash in (${`t1-${run}`}, ${`t2-${run}`})`;
+  });
+
+  it("the audit log records cards without their code", async () => {
+    await as(users.front_deskA, async (tx) => {
+      const [{ id }] = await tx`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${A.mum}, ${`audit-${run}`}) returning id`;
+      await tx`select set_config('app.user_id', ${users.companyOrg}, true)`;
+      const [row] = await tx`select after from audit_event where table_name = 'pickup_card' and row_id = ${id}`;
+      expect(row.after.guardian_id).toBe(A.mum);
+      expect(row.after).not.toHaveProperty("token_hash");
+    });
+  });
+
+  it("check-out records whether a QR card or the list was used", async () => {
+    await as(users.teacherA, async (tx) => {
+      await mark(tx, A.student);
+      await expectError(
+        tx,
+        (sp) => sp`update student_attendance set check_out_at = now(), collected_by_guardian_id = ${A.mum}, check_out_method = 'phone' where student_id = ${A.student} and date = ${today}`,
+        { code: "23514" },
+      );
+      const done = await tx`update student_attendance set check_out_at = now(), collected_by_guardian_id = ${A.mum}, check_out_method = 'qr' where student_id = ${A.student} and date = ${today}`;
+      expect(done.count).toBe(1);
     });
   });
 });

@@ -6,7 +6,7 @@
  */
 const PAGES = "yanmu-pages-v1";
 const STATIC = "yanmu-static-v1";
-const OFFLINE_PAGES = /^\/(ar|en)\/(roll-call|my-room)(\/|$)/;
+const OFFLINE_PAGES = /^\/(ar|en)\/(roll-call|my-class)(\/|$)/;
 
 self.addEventListener("install", () => self.skipWaiting());
 

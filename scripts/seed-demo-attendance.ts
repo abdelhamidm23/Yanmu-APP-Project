@@ -1,7 +1,7 @@
 /**
  * Demo staff and today's attendance (spec §16), called by `pnpm seed:demo`:
  *   Staff present 24 / 26 at Yanmu, 15 / 17 at Norvale.
- *   Children today: Yanmu 82 of 89 (7 of 7 rooms), Norvale 43 of 48 (4 of 5 rooms; Seniors 1 not taken yet).
+ *   Children today: Yanmu 82 of 89 (6 of 6 classes), Norvale 43 of 48 (6 of 8 classes; Seniors 1 and 3 not taken yet).
  *   One ratio breach: Norvale Toddlers 1, 12 children with 2 carers (1:6, required 1:4).
  * Children whose made-up pickup time (13:00 to 16:10) has already passed are checked out to a parent,
  * and the morning ratio snapshots are recorded, so the evening demo still shows today's breach.
@@ -15,20 +15,20 @@ import { cairoWallToUtc, todayInCairo } from "../src/lib/calendar";
 
 type Db = PostgresJsDatabase<typeof schema>;
 
-// [room English name, carers in the room, carers absent today]
+// [class English name, carers in the class, carers absent today]
 const CARERS: Record<"A" | "B", [string, number, number][]> = {
-  A: [["Babies 1", 4, 1], ["Toddlers 1", 3, 0], ["Toddlers 2", 3, 0], ["Juniors 1", 3, 0], ["Juniors 2", 3, 0], ["Seniors 1", 4, 1], ["Seniors 2", 3, 0]],
-  B: [["Babies 1", 2, 0], ["Toddlers 1", 3, 1], ["Juniors 1", 3, 0], ["Seniors 1", 2, 0], ["Seniors 2", 2, 0]],
+  A: [["Babies 1", 4, 1], ["Toddlers 1", 3, 0], ["Toddlers 2", 3, 0], ["Juniors 1", 4, 0], ["Seniors 1", 5, 1], ["Seniors 2", 4, 0]],
+  B: [["Babies 1", 2, 0], ["Toddlers 1", 3, 1], ["Toddlers 2", 1, 0], ["Juniors 1", 2, 0], ["Juniors 2", 2, 0], ["Seniors 1", 1, 0], ["Seniors 2", 1, 0], ["Seniors 3", 1, 0]],
 };
 // Other staff: [Arabic job title, absent today]
 const OTHERS: Record<"A" | "B", [string, boolean][]> = {
   A: [["طاهية", false], ["عاملة نظافة", false], ["موظفة استقبال", false]],
-  B: [["طاهية", false], ["عاملة نظافة", true], ["موظفة استقبال", false], ["مشرف الحافلة", false], ["مساعدة إدارية", false]],
+  B: [["طاهية", false], ["عاملة نظافة", true], ["موظفة استقبال", false], ["مشرف الحافلة", false]],
 };
-// Children today per room: [present, absent, excused]; rooms not listed have no roll call yet.
+// Children today per class: [present, absent, excused]; classes not listed have no roll call yet.
 const CHILDREN: Record<"A" | "B", Record<string, [number, number, number]>> = {
-  A: { "Babies 1": [8, 1, 0], "Toddlers 1": [10, 0, 1], "Toddlers 2": [10, 1, 0], "Juniors 1": [14, 1, 0], "Juniors 2": [13, 1, 1], "Seniors 1": [14, 2, 0], "Seniors 2": [13, 1, 1] },
-  B: { "Babies 1": [5, 1, 0], "Toddlers 1": [12, 0, 0], "Juniors 1": [16, 2, 0], "Seniors 2": [10, 2, 0] },
+  A: { "Babies 1": [8, 1, 0], "Toddlers 1": [10, 0, 1], "Toddlers 2": [10, 1, 0], "Juniors 1": [18, 1, 1], "Seniors 1": [18, 2, 1], "Seniors 2": [18, 2, 0] },
+  B: { "Babies 1": [5, 1, 0], "Toddlers 1": [12, 0, 0], "Toddlers 2": [4, 1, 0], "Juniors 1": [8, 1, 0], "Juniors 2": [8, 1, 0], "Seniors 2": [6, 1, 0] },
 };
 const EXCUSES = ["مريض", "موعد طبيب", "سفر مع الأسرة"];
 
@@ -98,7 +98,7 @@ async function fill(db: Db): Promise<string> {
       }
       people = await db.insert(schema.staff).values(rows).returning();
 
-      // The demo teacher at Yanmu is one of the Toddlers 1 carers, so "My room" works for them.
+      // The demo teacher at Yanmu is one of the Toddlers 1 carers, so "My class" works for them.
       if (code === "A") {
         const [teacher] = await db.select({ id: schema.appUser.id }).from(schema.appUser).where(eq(schema.appUser.email, "teacher@yanmu.test"));
         const mine = people.find((p) => p.defaultRoomId === roomId("Toddlers 1"));
