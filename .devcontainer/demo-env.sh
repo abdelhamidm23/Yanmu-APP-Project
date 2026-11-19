@@ -20,8 +20,9 @@ fi
 if [ -n "$CODESPACE_NAME" ] || [ -d /workspaces/.codespaces ]; then
   # In a codespace, also accept sign-in from any codespace address, so a wrong guess of the
   # address above can never lock everyone out of the demo.
-  # localhost:3000 covers a forwarder that reports the app's inside address as the origin.
-  export TRUSTED_ORIGINS="https://*.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev},https://*.app.github.dev,http://localhost:3000"
+  # GitHub's forwarder rewrites the browser's origin to the app's inside address, keeping https
+  # (seen in a real codespace: "https://localhost:3000"), so that is accepted too.
+  export TRUSTED_ORIGINS="https://*.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev},https://localhost:3000,http://localhost:3000"
 fi
 
 # A session secret made once per codespace and kept with it.
@@ -39,3 +40,7 @@ port_3000_pids() {
     done
   done | sort -u
 }
+
+# The last commit that changed the app itself (anything outside .devcontainer): a new build is
+# needed only when this moves.
+app_version() { git log -1 --format=%H -- . ':(exclude).devcontainer' 2>/dev/null; }

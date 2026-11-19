@@ -6,4 +6,4 @@ cd "$(dirname "$0")/.."
 sudo corepack enable pnpm
 pnpm install --frozen-lockfile
 pnpm build
-git rev-parse HEAD > .next/demo-commit
+app_version > .next/demo-commit

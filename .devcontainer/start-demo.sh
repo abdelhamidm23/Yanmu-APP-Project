@@ -29,9 +29,10 @@ if ! stop_app; then
 fi
 
 # After `git pull`, build the new version first (2 to 4 minutes).
-if [ "$(git rev-parse HEAD)" != "$(cat .next/demo-commit 2>/dev/null)" ]; then
+built="$(cat .next/demo-commit 2>/dev/null)"
+if [ -z "$built" ] || ! git merge-base --is-ancestor "$(app_version)" "$built" 2>/dev/null; then
   echo "Building the latest version of the app (2 to 4 minutes) ..."
-  pnpm install --frozen-lockfile && pnpm build && git rev-parse HEAD > .next/demo-commit
+  pnpm install --frozen-lockfile && pnpm build && app_version > .next/demo-commit
 fi
 
 for _ in $(seq 1 60); do
