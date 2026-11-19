@@ -116,6 +116,7 @@ test("QR pickup card: the branch manager makes one, the teacher scans it and han
   // Branch manager: make the card on the child's record. The code shows once, to print.
   const manager = await newPage(browser, "branch.manager@yanmu.test");
   manager.on("dialog", (d) => void d.accept());
+  await expect(manager).toHaveURL(/\/en\/today$/);
   await manager.goto(`/en/children/${kid.id}`);
   const control = manager.getByTestId("pickup-card").first();
   await expect(control.getByTestId("pickup-card-status")).toHaveText("No QR pickup card");
@@ -127,6 +128,7 @@ test("QR pickup card: the branch manager makes one, the teacher scans it and han
 
   // Teacher: the child is in class; scanning the card (here: typing its code) offers the hand-over.
   await signIn(page, "teacher@yanmu.test", "en");
+  await expect(page).toHaveURL(/\/en\/my-class$/);
   await page.goto("/en/roll-call");
   await page.getByTestId("mark-all-present").click();
   await expect(page.getByTestId("sync-status")).toHaveText("Everything is saved.");

@@ -261,7 +261,7 @@
       "ratioDisplay": "1 : {count}"
     },
     "calendar": {
-      "title": "Calendar",
+      "title": "Calendar and hours",
       "workingDays": "Working days",
       "workingDaysHelp": "Days the nurseries are open every week. Applies to late fees and attendance.",
       "days": {
