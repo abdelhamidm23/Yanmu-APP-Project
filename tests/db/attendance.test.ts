@@ -327,8 +327,8 @@ describe("staff, roster and fingerprint files (spec §8.3)", () => {
   });
 });
 
-describe("QR pickup cards (owner's review of phase 3)", () => {
-  it("front desk and the branch manager make and cancel cards; teachers and accountants only read them", async () => {
+describe("Pickup links and daily pickup codes (owner's review of phase 3)", () => {
+  it("front desk and the branch manager make and cancel pickup links; teachers and accountants only read them", async () => {
     await as(users.front_deskA, async (tx) => {
       const [c] = await tx`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchB}, ${A.mum}, ${`fd-${run}`}) returning id, branch_id`;
       expect(c.branch_id).toBe(branchA);
@@ -343,7 +343,7 @@ describe("QR pickup cards (owner's review of phase 3)", () => {
     }
   });
 
-  it("one card in use per adult; the code and the adult never change, and a cancelled card stays cancelled", async () => {
+  it("one link in use per adult; the secret and the adult never change, and a cancelled link stays cancelled", async () => {
     await as(users.branch_managerA, async (tx) => {
       const [c] = await tx`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${A.mum}, ${`bm-${run}`}) returning id`;
       await expectError(tx, (sp) => sp`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${A.mum}, ${`bm2-${run}`})`, { code: "23505" });
@@ -355,7 +355,7 @@ describe("QR pickup cards (owner's review of phase 3)", () => {
     });
   });
 
-  it("a teacher sees cards only for adults of children in their classes", async () => {
+  it("a teacher sees links only for adults of children in their classes", async () => {
     const [{ id: a2mum }] = await owner`select sg.guardian_id as id from student_guardian sg where sg.student_id = ${A2.student} and sg.can_pick_up`;
     await owner`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${A.mum}, ${`t1-${run}`})`;
     await owner`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${a2mum}, ${`t2-${run}`})`;
@@ -366,7 +366,7 @@ describe("QR pickup cards (owner's review of phase 3)", () => {
     await owner`delete from pickup_card where token_hash in (${`t1-${run}`}, ${`t2-${run}`})`;
   });
 
-  it("the audit log records cards without their code", async () => {
+  it("the audit log records links without their secret", async () => {
     await as(users.front_deskA, async (tx) => {
       const [{ id }] = await tx`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${A.mum}, ${`audit-${run}`}) returning id`;
       await tx`select set_config('app.user_id', ${users.companyOrg}, true)`;
@@ -376,7 +376,7 @@ describe("QR pickup cards (owner's review of phase 3)", () => {
     });
   });
 
-  it("check-out records whether a QR card or the list was used", async () => {
+  it("check-out records whether a pickup QR or the list was used", async () => {
     await as(users.teacherA, async (tx) => {
       await mark(tx, A.student);
       await expectError(
@@ -387,5 +387,53 @@ describe("QR pickup cards (owner's review of phase 3)", () => {
       const done = await tx`update student_attendance set check_out_at = now(), collected_by_guardian_id = ${A.mum}, check_out_method = 'qr' where student_id = ${A.student} and date = ${today}`;
       expect(done.count).toBe(1);
     });
+  });
+
+  it("a link page shows only the children of that link's adult, and nothing once cancelled", async () => {
+    const hash = `link-${run}`;
+    const [{ id }] = await owner`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${A.mum}, ${hash}) returning id`;
+    // The page is opened without signing in: the app role, no user set.
+    const rows = await app`select * from app_pickup_link_children(${hash})`;
+    expect(rows.map((r) => r.student_id)).toEqual([A.student]);
+    expect(Object.keys(rows[0]).sort()).toEqual(["branch_name_ar", "branch_name_en", "full_name_ar", "full_name_en", "guardian_name", "pickup_code_version", "student_id"]);
+    expect(await app`select * from app_pickup_link_children(${"no-such-link"})`).toHaveLength(0);
+    // Without the function, the app role sees no children and no links.
+    expect(await app`select id from student where id = ${A.student}`).toHaveLength(0);
+    expect(await app`select id from pickup_card where id = ${id}`).toHaveLength(0);
+    await owner`update pickup_card set revoked_at = now() where id = ${id}`;
+    expect(await app`select * from app_pickup_link_children(${hash})`).toHaveLength(0);
+  });
+
+  it("an adult who may no longer collect gets nothing on their link", async () => {
+    const hash = `stop-${run}`;
+    await owner`insert into pickup_card (branch_id, guardian_id, token_hash) values (${branchA}, ${A.mum}, ${hash})`;
+    await owner`update student_guardian set can_pick_up = false where student_id = ${A.student} and guardian_id = ${A.mum}`;
+    try {
+      expect(await app`select * from app_pickup_link_children(${hash})`).toHaveLength(0);
+    } finally {
+      await owner`update student_guardian set can_pick_up = true where student_id = ${A.student} and guardian_id = ${A.mum}`;
+      await owner`update pickup_card set revoked_at = now() where token_hash = ${hash}`;
+    }
+  });
+
+  it("only the child's own branch manager or front desk can give a new code for today", async () => {
+    const [before] = await owner`select pickup_code_version as v from student where id = ${A.student}`;
+    for (const who of ["front_deskA", "branch_managerA"]) {
+      await as(users[who], async (tx) => {
+        const [row] = await tx`update student set pickup_code_version = pickup_code_version + 1 where id = ${A.student} returning pickup_code_version as v`;
+        expect(row.v).toBe(before.v + 1);
+      });
+    }
+    // Another branch's child: not even the front desk of this branch.
+    await as(users.front_deskA, async (tx) => {
+      const out = await tx.savepoint((sp) => sp`update student set pickup_code_version = pickup_code_version + 1 where id = ${B.student}`).catch(() => ({ count: 0 }));
+      expect(out.count).toBe(0);
+    });
+    for (const who of ["teacherA", "accountantA", "hrA"]) {
+      await as(users[who], async (tx) => {
+        const out = await tx.savepoint((sp) => sp`update student set pickup_code_version = pickup_code_version + 1 where id = ${A.student}`).catch(() => ({ count: 0 }));
+        expect(out.count).toBe(0);
+      });
+    }
   });
 });

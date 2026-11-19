@@ -1,6 +1,6 @@
 import "server-only";
-import { and, eq, isNull, sql } from "drizzle-orm";
-import { pickupCard, pickupRefusal, studentAttendance } from "./schema";
+import { and, eq, sql } from "drizzle-orm";
+import { pickupRefusal, studentAttendance } from "./schema";
 import { dbErrorCode, dbRuleCode, type Tx } from "./rls";
 import { addDays } from "@/lib/children";
 import { todayInCairo } from "@/lib/calendar";
@@ -16,7 +16,7 @@ export function eventDateAllowed(date: string, today = todayInCairo()): boolean 
  * (spec §8.2 offline queue). Row-level security and the database triggers make the final decisions:
  * a teacher outside the room, or a check-out to someone not on the list, is rejected there too.
  */
-export async function applyAttendanceEvents(tx: Tx, events: AttendanceEvent[]) {
+export async function applyAttendanceEvents(tx: Tx, events: AttendanceEvent[], opts: { qrChecked?: boolean } = {}) {
   const results: EventResult[] = [];
   const days = new Map<string, DayRecord>();
   const rooms = new Set<string>();
@@ -53,14 +53,8 @@ export async function applyAttendanceEvents(tx: Tx, events: AttendanceEvent[]) {
               clientAt: row.clientAt?.toISOString() ?? null,
             }
           : EMPTY_DAY;
-        // A QR check-out needs the adult's card to be still in use (a phone may hold an old list).
-        if (ev.kind === "checkout" && ev.via === "qr") {
-          const [card] = await sp
-            .select({ id: pickupCard.id })
-            .from(pickupCard)
-            .where(and(eq(pickupCard.guardianId, ev.guardianId), isNull(pickupCard.revokedAt)));
-          if (!card) return { result: "rejected" as const, code: "card_cancelled" };
-        }
+        // A QR check-out is only taken from the scan screen, after the server has checked the child's code.
+        if (ev.kind === "checkout" && ev.via === "qr" && !opts.qrChecked) return { result: "rejected" as const, code: "qr_not_checked" };
         const next = applyEvent(before, ev);
         if ("error" in next) return { result: "rejected" as const, code: next.error };
         if (next.result === "stale") return { result: "stale" as const };

@@ -99,7 +99,7 @@ export function QrScanner({ onResult, onClose }: { onResult: (text: string) => v
         className="flex flex-col gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (typed.trim()) done.current(`YANMU-PICKUP:${typed.replace(/\s+/g, "")}`);
+          if (typed.trim()) done.current(typed);
         }}
       >
         <label htmlFor="qr-typed" className="text-[13px] font-medium text-subtle">

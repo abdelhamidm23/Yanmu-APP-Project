@@ -99,7 +99,7 @@ test("roll call, check-out to an approved adult, and a refused pickup reaching t
   await manager.context().close();
 });
 
-test("QR pickup card: the branch manager makes one, the teacher scans it and hands the child over", async ({ page, browser }) => {
+test("daily pickup QR: the parent's link shows today's code, the front desk scans it and hands the child over", async ({ page, browser }) => {
   const [kid] = await ownerQuery(
     (sql) => sql`
       select s.id, s.full_name_en as name, g.full_name as adult
@@ -113,62 +113,87 @@ test("QR pickup card: the branch manager makes one, the teacher scans it and han
   await ownerQuery((sql) => sql`update pickup_card set revoked_at = now() where revoked_at is null and guardian_id in
     (select guardian_id from student_guardian where student_id = ${kid.id as string})`);
 
-  // Branch manager: make the card on the child's record. The code shows once, to print.
+  // Branch manager: make the adult's private pickup link on the child's record. It shows once.
   const manager = await newPage(browser, "branch.manager@yanmu.test");
   manager.on("dialog", (d) => void d.accept());
   await expect(manager).toHaveURL(/\/en\/today$/);
   await manager.goto(`/en/children/${kid.id}`);
-  const control = manager.getByTestId("pickup-card").first();
-  await expect(control.getByTestId("pickup-card-status")).toHaveText("No QR pickup card");
-  await control.getByTestId("make-pickup-card").click();
-  await expect(control.getByTestId("pickup-card-print")).toContainText(`${kid.adult}`);
-  const code = (await control.getByTestId("pickup-card-code").textContent())!.trim();
-  expect(code.replace(/\s/g, "")).toMatch(/^[A-Za-z0-9_-]{22}$/);
-  await expect(control.getByTestId("pickup-card-status")).toContainText("QR pickup card in use since");
+  const control = manager.getByTestId("pickup-link").first();
+  await expect(control.getByTestId("pickup-link-status")).toHaveText("No pickup link yet");
+  await control.getByTestId("make-pickup-link").click();
+  const url = await control.getByTestId("pickup-link-url").inputValue();
+  expect(url).toMatch(/\/en\/p\/[A-Za-z0-9_-]{22}$/);
+  await expect(control.getByTestId("pickup-link-status")).toContainText("Pickup link in use since");
 
-  // Teacher: the child is in class; scanning the card (here: typing its code) offers the hand-over.
+  // The parent opens the link without signing in and sees today's code for the child.
+  const parentCtx = await browser.newContext({ baseURL: test.info().project.use.baseURL });
+  const parent = await parentCtx.newPage();
+  const path = new URL(url).pathname;
+  await parent.goto(path);
+  const card = parent.getByTestId("pickup-page-child").filter({ hasText: String(kid.name) });
+  await expect(card).toHaveCount(1);
+  const qr = (await card.getAttribute("data-qr"))!;
+  expect(qr).toMatch(/^YANMU-PICKUP:[0-9A-Z]{10}$/);
+  const typed = (await card.getByTestId("pickup-page-code").textContent())!.trim();
+  expect(typed.replace("-", "")).toBe(qr.slice("YANMU-PICKUP:".length));
+
+  // Teacher: roll call, so the child is in.
   await signIn(page, "teacher@yanmu.test", "en");
   await expect(page).toHaveURL(/\/en\/my-class$/);
   await page.goto("/en/roll-call");
   await page.getByTestId("mark-all-present").click();
-  await expect(page.getByTestId("sync-status")).toHaveText("Everything is saved.");
-  await page.getByTestId("tab-pickup").click();
-  await page.getByTestId("scan-card").click();
-  await page.locator("#qr-typed").fill(code);
-  await page.getByTestId("check-typed-code").click();
-  const result = page.getByTestId("qr-result");
-  await expect(result).toContainText(String(kid.adult));
-  await expect(result.locator(`[data-child="${kid.name}"]`)).toHaveCount(1);
-  await result.locator(`[data-child="${kid.name}"]`).getByTestId("qr-hand-over").click();
-  await expect(page.getByTestId("gone-list")).toContainText(`${kid.name}`);
-  await expect(page.getByTestId("gone-list")).toContainText("QR card");
-  // The tap is saved on the phone first and sent a moment later.
+  // The taps are saved on the phone first and sent a moment later.
   await expect
-    .poll(async () => {
-      const [day] = await ownerQuery(
-        (sql) => sql`select check_out_method from student_attendance where student_id = ${kid.id as string} and date = ${today}`,
-      );
-      return day?.check_out_method;
-    })
-    .toBe("qr");
+    .poll(async () => (await ownerQuery((sql) => sql`select status from student_attendance where student_id = ${kid.id as string} and date = ${today}`))[0]?.status)
+    .toBe("present");
 
-  // A wrong code is refused with a clear warning.
-  await page.getByTestId("scan-card").click();
-  await page.locator("#qr-typed").fill("not-a-real-card-code-000");
-  await page.getByTestId("check-typed-code").click();
-  await expect(page.getByTestId("qr-unknown")).toContainText("Do not hand over");
+  // Front desk: scan (here: type the code under the QR), check the adult, hand over.
+  const desk = await newPage(browser, "front.desk@yanmu.test");
+  await expect(desk).toHaveURL(/\/en\/today$/);
+  const scan = async (text: string) => {
+    await desk.getByTestId("scan-pickup").click();
+    await desk.locator("#qr-typed").fill(text);
+    await desk.getByTestId("check-typed-code").click();
+  };
+  await scan(typed.toLowerCase());
+  const result = desk.getByTestId("scan-result");
+  await expect(result).toContainText(String(kid.name));
+  await expect(result).toContainText("Class: Toddlers 1");
+  await expect(result.getByTestId("scan-hand-over")).toBeDisabled();
+  await result.locator("label", { hasText: String(kid.adult) }).getByTestId("scan-adult").check();
+  await result.getByTestId("scan-hand-over").click();
+  await expect(desk.getByTestId("scan-notice")).toHaveText(`${kid.name} handed over to ${kid.adult}.`);
+  const [day] = await ownerQuery((sql) => sql`select check_out_method, collected_by_guardian_id is not null as who from student_attendance where student_id = ${kid.id as string} and date = ${today}`);
+  expect(day.check_out_method).toBe("qr");
+  expect(day.who).toBe(true);
 
-  // Cancelling the card stops it working on the next load of the class.
+  // The same code again: the child has already gone.
+  await scan(qr);
+  await expect(desk.getByTestId("scan-result")).toContainText("already went home");
+  await desk.getByTestId("scan-cancel").click();
+
+  // A code that is not ours is refused with a clear warning.
+  await scan("AAAAA-BBBBB");
+  await expect(desk.getByTestId("scan-unknown")).toContainText("Do not hand over");
+  await desk.getByRole("button", { name: "Scan another" }).click();
+
+  // A new code for today: the link shows it at once, and the old one is called old.
   await manager.reload();
-  await manager.getByTestId("pickup-card").first().getByTestId("cancel-pickup-card").click();
-  await expect(manager.getByTestId("pickup-card").first().getByTestId("pickup-card-status")).toHaveText("No QR pickup card");
-  await page.reload();
-  await page.getByTestId("tab-pickup").click();
-  await page.getByTestId("scan-card").click();
-  await page.locator("#qr-typed").fill(code);
-  await page.getByTestId("check-typed-code").click();
-  await expect(page.getByTestId("qr-unknown")).toBeVisible();
-  await manager.context().close();
+  await manager.getByTestId("new-code-today-button").click();
+  await expect(manager.getByTestId("new-code-today")).toContainText("Pickup links now show the new code.");
+  await parent.reload();
+  await expect(card).not.toHaveAttribute("data-qr", qr);
+  await scan(qr);
+  await expect(desk.getByTestId("scan-old")).toContainText(String(kid.name));
+  await desk.getByRole("button", { name: "Scan another" }).click();
+
+  // Cancelling the link empties the parent's page.
+  await manager.getByTestId("pickup-link").first().getByTestId("cancel-pickup-link").click();
+  await expect(manager.getByTestId("pickup-link").first().getByTestId("pickup-link-status")).toHaveText("No pickup link yet");
+  await parent.reload();
+  await expect(parent.getByTestId("pickup-page-empty")).toBeVisible();
+  await expect(parent.getByTestId("pickup-page-child")).toHaveCount(0);
+  await Promise.all([manager.context().close(), desk.context().close(), parentCtx.close()]);
 });
 
 test("taps made without a connection are kept on the phone and sent when it returns", async ({ page, context }) => {

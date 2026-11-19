@@ -5,7 +5,7 @@ import { Link } from "@/i18n/navigation";
 import { withUserDb } from "@/db/rls";
 import { branchDirectory, branchRooms } from "@/db/children";
 import { approvalRequest, consentRecord, enrollment, family, guardian, pickupCard, room, student, studentGuardian, studentMedical } from "@/db/schema";
-import { PickupCardControl } from "./PickupCardControl";
+import { NewCodeTodayButton, PickupLinkControl } from "./PickupLinkControl";
 import { requireChildren } from "@/lib/require-user";
 import { canBreakGlass, canEditChildren, canEditMedical } from "@/lib/permissions";
 import { CONSENT_PURPOSES, RELATIONSHIPS, WITHDRAW_REASONS, ageInMonths, childAlerts } from "@/lib/children";
@@ -166,12 +166,10 @@ export default async function ChildPage({
               </span>
               {g.canPickUp && canEdit ? (
                 <div className="basis-full">
-                  <PickupCardControl
+                  <PickupLinkControl
                     locale={locale}
                     studentId={id}
                     guardianId={g.id}
-                    adultName={g.fullName}
-                    branchName={branchName(s.branchId)}
                     inUseSince={(() => {
                       const c = cards.find((x) => x.guardianId === g.id);
                       return c ? d(todayInCairo(c.since)) : null;
@@ -182,6 +180,7 @@ export default async function ChildPage({
             </li>
           ))}
         </ul>
+        {canEdit && guardians.some((g) => g.canPickUp) ? <NewCodeTodayButton locale={locale} studentId={id} /> : null}
         {canEdit ? (
           <details>
             <summary className="min-h-11 cursor-pointer py-2 font-medium text-brand">{t("detail.addGuardian")}</summary>

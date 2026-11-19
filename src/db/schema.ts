@@ -464,6 +464,8 @@ export const student = pgTable(
       .references(() => family.id),
     photoAttachmentId: uuid("photo_attachment_id").references(() => attachment.id),
     status: text("status").notNull().default("active"),
+    /** Bumped to give the child a new daily pickup QR code today (a screenshot reached the wrong person). */
+    pickupCodeVersion: integer("pickup_code_version").notNull().default(0),
     isDemo: boolean("is_demo").notNull().default(false),
     importBatchId: uuid("import_batch_id").references(() => importBatch.id),
     ...tracked,

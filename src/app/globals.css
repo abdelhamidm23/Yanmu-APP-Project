@@ -95,19 +95,3 @@ html[lang="ar"] body {
     animation: none !important;
   }
 }
-
-/* Printing a QR pickup card: only the card is printed. */
-@media print {
-  body:has(.print-area) * {
-    visibility: hidden;
-  }
-  body:has(.print-area) .print-area,
-  body:has(.print-area) .print-area * {
-    visibility: visible;
-  }
-  body:has(.print-area) .print-area {
-    position: absolute;
-    inset-block-start: 0;
-    inset-inline-start: 0;
-  }
-}
