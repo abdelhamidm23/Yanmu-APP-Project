@@ -21,7 +21,7 @@ import {
 import type { Tx } from "./rls";
 import type { CurrentUser } from "@/lib/session";
 import { ATTENDANCE_EDIT_ROLES, hasRoleIn } from "@/lib/permissions";
-import { attendanceSummary, carerPresence, effectiveRoster, roomRatio, type AttendanceStatus } from "@/lib/attendance";
+import { attendanceSummary, carerPresence, effectiveRoster, roomRatio, type AttendanceStatus, type DayRecord } from "@/lib/attendance";
 
 /** Rooms this person takes roll call for: every room of their branches (manager, front desk) or their assigned rooms (teacher). */
 export async function attendanceRooms(tx: Tx, user: Pick<CurrentUser, "id" | "grants">) {
@@ -73,6 +73,7 @@ export async function roomDay(tx: Tx, roomId: string, date: string, opts: { medi
       checkInAt: studentAttendance.checkInAt,
       checkOutAt: studentAttendance.checkOutAt,
       collectedBy: studentAttendance.collectedByGuardianId,
+      checkOutVia: studentAttendance.checkOutMethod,
       clientAt: studentAttendance.clientAt,
     })
     .from(enrollment)
@@ -121,6 +122,7 @@ export async function roomDay(tx: Tx, roomId: string, date: string, opts: { medi
           checkInAt: k.checkInAt?.toISOString() ?? null,
           checkOutAt: k.checkOutAt?.toISOString() ?? null,
           collectedByGuardianId: k.collectedBy,
+          checkOutVia: (k.checkOutVia as DayRecord["checkOutVia"]) ?? null,
           clientAt: k.clientAt?.toISOString() ?? null,
         },
         pickup: adults.filter((a) => a.studentId === k.id && a.canPickUp).map(({ id, fullName, relationship, photoId }) => ({ id, fullName, relationship, photoId })),

@@ -10,7 +10,7 @@ import { ownerQuery, resetChildren, signIn } from "./helpers";
 const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date());
 const yesterday = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date(Date.now() - 86400000));
 
-/** Yanmu Toddlers 1 (the demo teacher's room): no roll call yet today and no refused pickups. */
+/** Yanmu Toddlers 1 (the demo teacher's class): no roll call yet today and no refused pickups. */
 async function clearTeacherRoom() {
   await ownerQuery(async (sql) => {
     const room = sql`(select r.id from room r join branch b on b.id = r.branch_id where b.code = 'A' and r.name_en = 'Toddlers 1')`;
@@ -49,7 +49,7 @@ test.beforeEach(async () => {
 
 test("roll call, check-out to an approved adult, and a refused pickup reaching the branch manager", async ({ page, browser }) => {
   await signIn(page, "teacher@yanmu.test", "en");
-  await expect(page).toHaveURL(/\/en\/my-room$/);
+  await expect(page).toHaveURL(/\/en\/my-class$/);
   await page.goto("/en/roll-call");
   // One room: the list opens straight on it.
   await expect(page).toHaveURL(/\/en\/roll-call\/[0-9a-f-]+$/);
@@ -99,9 +99,106 @@ test("roll call, check-out to an approved adult, and a refused pickup reaching t
   await manager.context().close();
 });
 
+test("daily pickup QR: the parent's link shows today's code, the front desk scans it and hands the child over", async ({ page, browser }) => {
+  const [kid] = await ownerQuery(
+    (sql) => sql`
+      select s.id, s.full_name_en as name, g.full_name as adult
+      from enrollment e join student s on s.id = e.student_id
+      join room r on r.id = e.room_id join branch b on b.id = r.branch_id
+      join student_guardian sg on sg.student_id = s.id and sg.can_pick_up
+      join guardian g on g.id = sg.guardian_id
+      where b.code = 'A' and r.name_en = 'Toddlers 1' and e.status = 'active'
+      order by s.full_name_en, sg.is_primary_contact desc limit 1`,
+  );
+  await ownerQuery((sql) => sql`update pickup_card set revoked_at = now() where revoked_at is null and guardian_id in
+    (select guardian_id from student_guardian where student_id = ${kid.id as string})`);
+
+  // Branch manager: make the adult's private pickup link on the child's record. It shows once.
+  const manager = await newPage(browser, "branch.manager@yanmu.test");
+  manager.on("dialog", (d) => void d.accept());
+  await expect(manager).toHaveURL(/\/en\/today$/);
+  await manager.goto(`/en/children/${kid.id}`);
+  const control = manager.getByTestId("pickup-link").first();
+  await expect(control.getByTestId("pickup-link-status")).toHaveText("No pickup link yet");
+  await control.getByTestId("make-pickup-link").click();
+  const url = await control.getByTestId("pickup-link-url").inputValue();
+  expect(url).toMatch(/\/en\/p\/[A-Za-z0-9_-]{22}$/);
+  await expect(control.getByTestId("pickup-link-status")).toContainText("Pickup link in use since");
+
+  // The parent opens the link without signing in and sees today's code for the child.
+  const parentCtx = await browser.newContext({ baseURL: test.info().project.use.baseURL });
+  const parent = await parentCtx.newPage();
+  const path = new URL(url).pathname;
+  await parent.goto(path);
+  const card = parent.getByTestId("pickup-page-child").filter({ hasText: String(kid.name) });
+  await expect(card).toHaveCount(1);
+  const qr = (await card.getAttribute("data-qr"))!;
+  expect(qr).toMatch(/^YANMU-PICKUP:[0-9A-Z]{10}$/);
+  const typed = (await card.getByTestId("pickup-page-code").textContent())!.trim();
+  expect(typed.replace("-", "")).toBe(qr.slice("YANMU-PICKUP:".length));
+
+  // Teacher: roll call, so the child is in.
+  await signIn(page, "teacher@yanmu.test", "en");
+  await expect(page).toHaveURL(/\/en\/my-class$/);
+  await page.goto("/en/roll-call");
+  await page.getByTestId("mark-all-present").click();
+  // The taps are saved on the phone first and sent a moment later.
+  await expect
+    .poll(async () => (await ownerQuery((sql) => sql`select status from student_attendance where student_id = ${kid.id as string} and date = ${today}`))[0]?.status)
+    .toBe("present");
+
+  // Front desk: scan (here: type the code under the QR), check the adult, hand over.
+  const desk = await newPage(browser, "front.desk@yanmu.test");
+  await expect(desk).toHaveURL(/\/en\/today$/);
+  const scan = async (text: string) => {
+    await desk.getByTestId("scan-pickup").click();
+    await desk.locator("#qr-typed").fill(text);
+    await desk.getByTestId("check-typed-code").click();
+  };
+  await scan(typed.toLowerCase());
+  const result = desk.getByTestId("scan-result");
+  await expect(result).toContainText(String(kid.name));
+  await expect(result).toContainText("Class: Toddlers 1");
+  await expect(result.getByTestId("scan-hand-over")).toBeDisabled();
+  await result.locator("label", { hasText: String(kid.adult) }).getByTestId("scan-adult").check();
+  await result.getByTestId("scan-hand-over").click();
+  await expect(desk.getByTestId("scan-notice")).toHaveText(`${kid.name} handed over to ${kid.adult}.`);
+  const [day] = await ownerQuery((sql) => sql`select check_out_method, collected_by_guardian_id is not null as who from student_attendance where student_id = ${kid.id as string} and date = ${today}`);
+  expect(day.check_out_method).toBe("qr");
+  expect(day.who).toBe(true);
+
+  // The same code again: the child has already gone.
+  await scan(qr);
+  await expect(desk.getByTestId("scan-result")).toContainText("already went home");
+  await desk.getByTestId("scan-cancel").click();
+
+  // A code that is not ours is refused with a clear warning.
+  await scan("AAAAA-BBBBB");
+  await expect(desk.getByTestId("scan-unknown")).toContainText("Do not hand over");
+  await desk.getByRole("button", { name: "Scan another" }).click();
+
+  // A new code for today: the link shows it at once, and the old one is called old.
+  await manager.reload();
+  await manager.getByTestId("new-code-today-button").click();
+  await expect(manager.getByTestId("new-code-today")).toContainText("Pickup links now show the new code.");
+  await parent.reload();
+  await expect(card).not.toHaveAttribute("data-qr", qr);
+  await scan(qr);
+  await expect(desk.getByTestId("scan-old")).toContainText(String(kid.name));
+  await desk.getByRole("button", { name: "Scan another" }).click();
+
+  // Cancelling the link empties the parent's page.
+  await manager.getByTestId("pickup-link").first().getByTestId("cancel-pickup-link").click();
+  await expect(manager.getByTestId("pickup-link").first().getByTestId("pickup-link-status")).toHaveText("No pickup link yet");
+  await parent.reload();
+  await expect(parent.getByTestId("pickup-page-empty")).toBeVisible();
+  await expect(parent.getByTestId("pickup-page-child")).toHaveCount(0);
+  await Promise.all([manager.context().close(), desk.context().close(), parentCtx.close()]);
+});
+
 test("taps made without a connection are kept on the phone and sent when it returns", async ({ page, context }) => {
   await signIn(page, "teacher@yanmu.test", "en");
-  await expect(page).toHaveURL(/\/en\/my-room$/);
+  await expect(page).toHaveURL(/\/en\/my-class$/);
   await page.goto("/en/roll-call");
   await expect(page.getByTestId("sync-status")).toHaveText("Everything is saved.");
   await context.setOffline(true);
@@ -185,7 +282,7 @@ test("a ratio breach shows on Today and the roster fixes it", async ({ page }) =
   await expect(page).toHaveURL(/\/en\/today$/);
   const toddlers = page.getByTestId("today-room").filter({ hasText: "Toddlers 1" });
   await expect(toddlers.getByTestId("ratio-breach")).toHaveText("Ratio broken: 2 carers, 3 needed");
-  await expect(page.getByTestId("team-today")).toContainText("1 room is below the ratio");
+  await expect(page.getByTestId("team-today")).toContainText("1 class is below the ratio");
 
   await page.getByTestId("open-roster").click();
   const row = page.locator(`li:has(input[name="staffId"][value="${absent.id}"])`);
@@ -202,7 +299,7 @@ test("a ratio breach shows on Today and the roster fixes it", async ({ page }) =
 
 test("quick PIN sign-in on a shared class phone", async ({ page }) => {
   await signIn(page, "teacher@yanmu.test", "en");
-  await expect(page).toHaveURL(/\/en\/my-room$/);
+  await expect(page).toHaveURL(/\/en\/my-class$/);
   await page.goto("/en/more");
   await page.locator("#pin").fill("1234");
   await page.locator("#pinAgain").fill("1234");
@@ -222,5 +319,5 @@ test("quick PIN sign-in on a shared class phone", async ({ page }) => {
   await expect(quick).toContainText("Wrong PIN. Try again.");
   await page.locator("#quick-pin").fill("2580");
   await page.getByTestId("pin-submit").click();
-  await expect(page).toHaveURL(/\/en\/my-room$/);
+  await expect(page).toHaveURL(/\/en\/my-class$/);
 });

@@ -29,4 +29,6 @@ export const AUDITED_TABLES = [
   "student_attendance",
   "pickup_refusal",
   "import_mapping",
+  // Review of phases 0 to 3 (drizzle/0008)
+  "pickup_card",
 ] as const;

@@ -6,7 +6,7 @@ import { branchRoomsToday, lastPunchImport, openRefusals, roomsBreachedSince, st
 import { readOrgSettings } from "@/db/settings";
 import { requireArea } from "@/lib/require-user";
 import { canEditRoster, canImportPunches, hasRoleIn } from "@/lib/permissions";
-import { LATE_PICKUP_MINUTES } from "@/lib/attendance";
+import { stillInAlertTime } from "@/lib/attendance";
 import { cairoTimeOf, cairoWallToUtc, minutesOf, todayInCairo } from "@/lib/calendar";
 import { formatNumber, formatPlainDate, formatTimestamp } from "@/lib/format";
 import { localName } from "@/lib/i18n-names";
@@ -16,6 +16,7 @@ import { buttonClasses } from "@/components/ui/Button";
 import { PageHeader } from "@/components/settings/Fields";
 import { ResultBanner } from "@/components/settings/ResultBanner";
 import { BranchTabs, Flag, pickBranch } from "@/components/children/BranchTabs";
+import { PickupScan } from "@/components/attendance/PickupScan";
 import { acknowledgeRefusal } from "./actions";
 
 /** Branch manager / front desk — Today (spec §11.6). Phase 3 parts: roll call, ratios, roster, staff file, pickups. */
@@ -49,7 +50,7 @@ export default async function TodayPage({
       readOrgSettings(tx),
       manager ? roomsBreachedSince(tx, b.id, startOfDay) : Promise.resolve([] as string[]),
     ]);
-    return { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, closing: String(settings.get("attendance.closing_time") ?? "16:00") };
+    return { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, until: stillInAlertTime(String(settings.get("attendance.closing_time") ?? "16:00"), Number(settings.get("attendance.after_school_minutes") ?? 60)) };
   });
   if (!data) {
     return (
@@ -59,7 +60,7 @@ export default async function TodayPage({
       </div>
     );
   }
-  const { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, closing } = data;
+  const { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, until } = data;
   const present = rooms.reduce((s, r) => s + r.present, 0);
   // Rule 1: children not marked yet are not counted as absent; the roll-call line shows what is missing.
   const expected = rooms.reduce((s, r) => s + r.present + r.absent, 0);
@@ -70,7 +71,7 @@ export default async function TodayPage({
   // Rooms that fell short earlier today and are fine now still count for the day (spec §16).
   const earlier = rooms.filter((r) => r.ratio.state !== "breach" && breachedToday.includes(r.id));
   const STILL_IN_NAMES = 10;
-  const lateNow = minutesOf(cairoTimeOf(new Date())) >= minutesOf(closing) + LATE_PICKUP_MINUTES;
+  const lateNow = minutesOf(cairoTimeOf(new Date())) >= minutesOf(until);
   const openRefusalsCount = refusals.filter((r) => !r.acknowledgedAt).length;
   const q = `branch=${b.id}`;
 
@@ -79,6 +80,8 @@ export default async function TodayPage({
       <PageHeader title={t("title")} help={`${localName(b, locale)} · ${formatPlainDate(date, loc, user.digits)}`} />
       <BranchTabs branches={branches} current={b.id} path="/today" locale={locale} label={t("branch")} />
       <ResultBanner searchParams={sp} />
+
+      <PickupScan locale={locale} branchId={b.id} />
 
       {openRefusalsCount ? (
         <Card className="flex flex-col gap-2 border-critical" data-testid="refusals">
@@ -114,7 +117,7 @@ export default async function TodayPage({
 
       {lateNow && stillIn.length ? (
         <Alert>
-          {t("stillIn", { count: stillIn.length, n: n(stillIn.length), closing })}{" "}
+          {t("stillIn", { count: stillIn.length, n: n(stillIn.length), until })}{" "}
           {stillIn
             .slice(0, STILL_IN_NAMES)
             .map((c) => (locale === "ar" ? c.fullNameAr : c.fullNameEn))
