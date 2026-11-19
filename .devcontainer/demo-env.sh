@@ -20,7 +20,8 @@ fi
 if [ -n "$CODESPACE_NAME" ] || [ -d /workspaces/.codespaces ]; then
   # In a codespace, also accept sign-in from any codespace address, so a wrong guess of the
   # address above can never lock everyone out of the demo.
-  export TRUSTED_ORIGINS="https://*.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev}"
+  # localhost:3000 covers a forwarder that reports the app's inside address as the origin.
+  export TRUSTED_ORIGINS="https://*.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-app.github.dev},https://*.app.github.dev,http://localhost:3000"
 fi
 
 # A session secret made once per codespace and kept with it.

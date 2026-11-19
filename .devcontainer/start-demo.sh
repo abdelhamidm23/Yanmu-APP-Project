@@ -9,11 +9,25 @@ cd "$(dirname "$0")/.."
 . .devcontainer/demo-env.sh
 LOG=/tmp/nursery-demo.log
 
-# Stop an earlier copy of the app, if one is still running.
-pkill -f "scripts/preview-start.mjs" 2>/dev/null
-pkill -f "next start" 2>/dev/null
-pkill -f "next-server" 2>/dev/null
-for _ in $(seq 1 20); do curl -fs -o /dev/null http://localhost:3000/api/health || break; sleep 1; done
+# Stop an earlier copy of the app, if one is still running. It may belong to another user of the
+# codespace (setup steps can run as root), so fall back to sudo.
+APP_PATTERN="scripts/preview-start.mjs|next start|next-server|next/dist/bin/next"
+app_answers() { curl -fs -o /dev/null -m 3 http://localhost:3000/api/health; }
+port_pids() { sudo -n ss -ltnpH 'sport = :3000' 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2; }
+stop_app() {
+  for signal in TERM TERM KILL; do
+    pids="$(pgrep -f "$APP_PATTERN") $(port_pids)"
+    pids="$(echo $pids)"
+    if [ -n "$pids" ]; then kill -s "$signal" $pids 2>/dev/null || sudo -n kill -s "$signal" $pids 2>/dev/null; fi
+    for _ in $(seq 1 10); do app_answers || return 0; sleep 1; done
+  done
+  return 1
+}
+if ! stop_app; then
+  echo "An older copy of the app is still running and could not be stopped."
+  echo "Please stop the codespace (github.com/codespaces, ... menu, Stop codespace) and open it again."
+  exit 1
+fi
 
 # After `git pull`, build the new version first (2 to 4 minutes).
 if [ "$(git rev-parse HEAD)" != "$(cat .next/demo-commit 2>/dev/null)" ]; then
@@ -32,7 +46,8 @@ setsid nohup node scripts/preview-start.mjs > "$LOG" 2>&1 < /dev/null &
 
 # Wait (up to 4 minutes) until the app answers, so the browser opens on a working page.
 for _ in $(seq 1 240); do
-  if curl -fs -o /dev/null http://localhost:3000/api/health; then
+  if ! pgrep -f "scripts/preview-start.mjs" >/dev/null; then break; fi
+  if app_answers; then
     # Lets the address open on a phone without signing in to GitHub there. If GitHub refuses,
     # the address still works on any device signed in to GitHub.
     if [ -n "${CODESPACE_NAME:-}" ]; then gh codespace ports visibility 3000:public -c "$CODESPACE_NAME" >/dev/null 2>&1 || true; fi

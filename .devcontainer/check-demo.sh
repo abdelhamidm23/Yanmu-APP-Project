@@ -10,6 +10,13 @@ echo "Codespace    : ${CODESPACE_NAME:-not found}"
 echo "App address  : $BETTER_AUTH_URL"
 echo "Also allowed : ${TRUSTED_ORIGINS:-none}"
 echo "Database     : $(node -e "require('net').connect(5432,'localhost').on('connect',()=>{console.log('answering');process.exit(0)}).on('error',()=>{console.log('NOT answering');process.exit(0)})")"
+pid=$(pgrep -f "next-server|next start" | head -n 1)
+if [ -n "$pid" ]; then
+  running_url=$( { cat "/proc/$pid/environ" 2>/dev/null || sudo -n cat "/proc/$pid/environ" 2>/dev/null; } | tr '\0' '\n' | sed -n 's/^BETTER_AUTH_URL=//p')
+  echo "Running app  : user $(ps -o user= -p "$pid"), started $(ps -o etime= -p "$pid" | xargs) ago, address ${running_url:-unknown}"
+else
+  echo "Running app  : none found"
+fi
 echo "App          : $(curl -s -m 5 http://localhost:3000/api/health || echo 'NOT answering')"
 # The same sign-in the browser makes, with the browser's address as its origin.
 for origin in "$BETTER_AUTH_URL"; do
