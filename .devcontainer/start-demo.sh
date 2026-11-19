@@ -13,10 +13,9 @@ LOG=/tmp/nursery-demo.log
 # codespace (setup steps can run as root), so fall back to sudo.
 APP_PATTERN="scripts/preview-start.mjs|next start|next-server|next/dist/bin/next"
 app_answers() { curl -fs -o /dev/null -m 3 http://localhost:3000/api/health; }
-port_pids() { sudo -n ss -ltnpH 'sport = :3000' 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2; }
 stop_app() {
   for signal in TERM TERM KILL; do
-    pids="$(pgrep -f "$APP_PATTERN") $(port_pids)"
+    pids="$(pgrep -f "$APP_PATTERN") $(port_3000_pids)"
     pids="$(echo $pids)"
     if [ -n "$pids" ]; then kill -s "$signal" $pids 2>/dev/null || sudo -n kill -s "$signal" $pids 2>/dev/null; fi
     for _ in $(seq 1 10); do app_answers || return 0; sleep 1; done

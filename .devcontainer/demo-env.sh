@@ -29,3 +29,13 @@ SECRET_FILE="$HOME/.yanmu-demo-secret"
 [ -s "$SECRET_FILE" ] || head -c 32 /dev/urandom | base64 > "$SECRET_FILE"
 BETTER_AUTH_SECRET="$(cat "$SECRET_FILE")"
 export BETTER_AUTH_SECRET
+
+# Process ids listening on port 3000 (works without `ss`; uses sudo for other users' processes).
+port_3000_pids() {
+  local inode p
+  for inode in $(awk '$4=="0A" && $2 ~ /:0BB8$/ {print $10}' /proc/net/tcp /proc/net/tcp6 2>/dev/null); do
+    for p in /proc/[0-9]*; do
+      { ls -l "$p/fd" 2>/dev/null || sudo -n ls -l "$p/fd" 2>/dev/null; } | grep -q "socket:\[$inode\]" && echo "${p#/proc/}"
+    done
+  done | sort -u
+}
