@@ -20,6 +20,8 @@
   "postCreateCommand": "bash .devcontainer/build-demo.sh",
   // Every time the codespace starts: fresh demo accounts, today's demo attendance, then the app.
   "postStartCommand": "bash .devcontainer/start-demo.sh",
+  // Every time the window opens or reloads: start the demo again if it stopped.
+  "postAttachCommand": "bash .devcontainer/ensure-demo.sh",
   "customizations": {
     "codespaces": { "openFiles": [".devcontainer/README.md"] },
     "vscode": { "settings": { "workbench.startupEditor": "none", "telemetry.telemetryLevel": "off" } }

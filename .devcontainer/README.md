@@ -11,4 +11,10 @@ This window is GitHub Codespaces. You do not need to type anything here.
 
 GitHub gives every account 120 free hours a month (60 hours of this demo). Without a card on file it simply stops when they run out; nothing is ever charged.
 
-If something looks wrong, the app's log is in `/tmp/nursery-demo.log`.
+**If sign-in fails or the app does not open:** click in the **Terminal** at the bottom of this window, paste this line and press Enter:
+
+```
+bash .devcontainer/start-demo.sh
+```
+
+Wait until it says "The demo is running", then reload the app tab. The app's log is in `/tmp/nursery-demo.log`.
