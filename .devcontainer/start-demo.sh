@@ -45,8 +45,12 @@ echo "Starting the demo at $BETTER_AUTH_URL ..."
 setsid nohup node scripts/preview-start.mjs > "$LOG" 2>&1 < /dev/null &
 
 # Wait (up to 4 minutes) until the app answers, so the browser opens on a working page.
+# The new copy needs a moment to appear in the process list; give up only once it has been gone
+# for 5 seconds in a row.
+missing=0
 for _ in $(seq 1 240); do
-  if ! pgrep -f "scripts/preview-start.mjs" >/dev/null; then break; fi
+  if pgrep -f "node scripts/preview-start.mjs" >/dev/null; then missing=0; else missing=$((missing + 1)); fi
+  if [ "$missing" -ge 5 ]; then break; fi
   if app_answers; then
     # Lets the address open on a phone without signing in to GitHub there. If GitHub refuses,
     # the address still works on any device signed in to GitHub.
@@ -57,5 +61,6 @@ for _ in $(seq 1 240); do
   fi
   sleep 1
 done
-echo "The demo did not start. Details are in $LOG:"
+echo "The demo did not start. The last lines of $LOG:"
 tail -n 40 "$LOG"
+exit 1
