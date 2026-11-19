@@ -15,6 +15,12 @@ pkill -f "next start" 2>/dev/null
 pkill -f "next-server" 2>/dev/null
 for _ in $(seq 1 20); do curl -fs -o /dev/null http://localhost:3000/api/health || break; sleep 1; done
 
+# After `git pull`, build the new version first (2 to 4 minutes).
+if [ "$(git rev-parse HEAD)" != "$(cat .next/demo-commit 2>/dev/null)" ]; then
+  echo "Building the latest version of the app (2 to 4 minutes) ..."
+  pnpm install --frozen-lockfile && pnpm build && git rev-parse HEAD > .next/demo-commit
+fi
+
 for _ in $(seq 1 60); do
   node -e "require('net').connect(5432,'localhost').on('connect',()=>process.exit(0)).on('error',()=>process.exit(1))" && break
   sleep 1
@@ -31,6 +37,7 @@ for _ in $(seq 1 240); do
     # the address still works on any device signed in to GitHub.
     if [ -n "${CODESPACE_NAME:-}" ]; then gh codespace ports visibility 3000:public -c "$CODESPACE_NAME" >/dev/null 2>&1 || true; fi
     echo "The demo is running: $BETTER_AUTH_URL"
+    bash .devcontainer/check-demo.sh
     exit 0
   fi
   sleep 1

@@ -31,7 +31,9 @@ export function LoginForm({ demo }: { demo?: DemoLogins }) {
         password: String(form.get("password") ?? ""),
       });
       if (err) {
-        setError(err.status === 429 ? t("tooManyAttempts") : err.status === 401 ? t("invalidCredentials") : t("genericError"));
+        const message = err.status === 429 ? t("tooManyAttempts") : err.status === 401 ? t("invalidCredentials") : t("genericError");
+        // Demo only: show the server's reason, so a screenshot is enough to find a setup problem.
+        setError(demo && err.status !== 401 ? `${message} (${err.status} ${err.code ?? err.statusText ?? ""})`.trim() : message);
         return;
       }
       if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) {
@@ -43,8 +45,8 @@ export function LoginForm({ demo }: { demo?: DemoLogins }) {
       // The server picks the start screen for this person's role.
       router.replace("/");
       router.refresh();
-    } catch {
-      setError(t("genericError"));
+    } catch (e) {
+      setError(demo ? `${t("genericError")} (${e instanceof Error ? e.message : "network"})` : t("genericError"));
     } finally {
       setBusy(false);
     }
