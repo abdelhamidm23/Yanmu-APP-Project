@@ -136,5 +136,13 @@ export function attendanceSummary(statuses: (AttendanceStatus | null)[]) {
   return { present, absent, excused, notMarked, expected: statuses.length - excused, complete: notMarked === 0 && statuses.length > 0 };
 }
 
-/** Spec §8.2: children still checked in this many minutes after closing time alert the branch manager. */
-export const LATE_PICKUP_MINUTES = 30;
+/**
+ * Spec §8.2, as set by the owner: the school day ends at `attendance.closing_time` (16:00) and an
+ * after-school hour (`attendance.after_school_minutes`, 60) covers late pickups. Children still
+ * checked in after that alert the branch manager. Returns "HH:MM", capped at 23:59.
+ */
+export function stillInAlertTime(closing: string, afterSchoolMinutes: number): string {
+  const [h, m] = closing.split(":").map(Number);
+  const total = Math.min(h * 60 + m + Math.max(0, afterSchoolMinutes), 23 * 60 + 59);
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}

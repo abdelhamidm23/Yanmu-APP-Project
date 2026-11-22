@@ -10,7 +10,7 @@ import { ownerQuery, resetChildren, signIn } from "./helpers";
 const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date());
 const yesterday = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" }).format(new Date(Date.now() - 86400000));
 
-/** Yanmu Toddlers 1 (the demo teacher's room): no roll call yet today and no refused pickups. */
+/** Yanmu Toddlers 1 (the demo teacher's class): no roll call yet today and no refused pickups. */
 async function clearTeacherRoom() {
   await ownerQuery(async (sql) => {
     const room = sql`(select r.id from room r join branch b on b.id = r.branch_id where b.code = 'A' and r.name_en = 'Toddlers 1')`;
@@ -49,7 +49,7 @@ test.beforeEach(async () => {
 
 test("roll call, check-out to an approved adult, and a refused pickup reaching the branch manager", async ({ page, browser }) => {
   await signIn(page, "teacher@yanmu.test", "en");
-  await expect(page).toHaveURL(/\/en\/my-room$/);
+  await expect(page).toHaveURL(/\/en\/my-class$/);
   await page.goto("/en/roll-call");
   // One room: the list opens straight on it.
   await expect(page).toHaveURL(/\/en\/roll-call\/[0-9a-f-]+$/);
@@ -101,7 +101,7 @@ test("roll call, check-out to an approved adult, and a refused pickup reaching t
 
 test("taps made without a connection are kept on the phone and sent when it returns", async ({ page, context }) => {
   await signIn(page, "teacher@yanmu.test", "en");
-  await expect(page).toHaveURL(/\/en\/my-room$/);
+  await expect(page).toHaveURL(/\/en\/my-class$/);
   await page.goto("/en/roll-call");
   await expect(page.getByTestId("sync-status")).toHaveText("Everything is saved.");
   await context.setOffline(true);
@@ -185,7 +185,7 @@ test("a ratio breach shows on Today and the roster fixes it", async ({ page }) =
   await expect(page).toHaveURL(/\/en\/today$/);
   const toddlers = page.getByTestId("today-room").filter({ hasText: "Toddlers 1" });
   await expect(toddlers.getByTestId("ratio-breach")).toHaveText("Ratio broken: 2 carers, 3 needed");
-  await expect(page.getByTestId("team-today")).toContainText("1 room is below the ratio");
+  await expect(page.getByTestId("team-today")).toContainText("1 class is below the ratio");
 
   await page.getByTestId("open-roster").click();
   const row = page.locator(`li:has(input[name="staffId"][value="${absent.id}"])`);
@@ -202,7 +202,7 @@ test("a ratio breach shows on Today and the roster fixes it", async ({ page }) =
 
 test("quick PIN sign-in on a shared class phone", async ({ page }) => {
   await signIn(page, "teacher@yanmu.test", "en");
-  await expect(page).toHaveURL(/\/en\/my-room$/);
+  await expect(page).toHaveURL(/\/en\/my-class$/);
   await page.goto("/en/more");
   await page.locator("#pin").fill("1234");
   await page.locator("#pinAgain").fill("1234");
@@ -222,5 +222,5 @@ test("quick PIN sign-in on a shared class phone", async ({ page }) => {
   await expect(quick).toContainText("Wrong PIN. Try again.");
   await page.locator("#quick-pin").fill("2580");
   await page.getByTestId("pin-submit").click();
-  await expect(page).toHaveURL(/\/en\/my-room$/);
+  await expect(page).toHaveURL(/\/en\/my-class$/);
 });

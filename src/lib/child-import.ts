@@ -20,7 +20,7 @@ export const IMPORT_COLUMNS = [
   { key: "fullNameEn", en: "Child name (English)", ar: "اسم الطفل (إنجليزي)", required: true, example: "Laila Ahmed Hassan" },
   { key: "dateOfBirth", en: "Date of birth", ar: "تاريخ الميلاد", required: true, example: "2024-05-14" },
   { key: "gender", en: "Gender (female/male)", ar: "النوع (أنثى/ذكر)", required: true, example: "female" },
-  { key: "room", en: "Room", ar: "الفصل", required: true, example: "Toddlers 1" },
+  { key: "room", en: "Class", ar: "الفصل", required: true, example: "Toddlers 1" },
   { key: "startDate", en: "Start date", ar: "تاريخ البدء", required: true, example: "2025-09-01" },
   { key: "guardian1Name", en: "Guardian 1 name", ar: "اسم ولي الأمر ١", required: true, example: "Mona Ali" },
   { key: "guardian1Relationship", en: "Guardian 1 relationship", ar: "صلة ولي الأمر ١", required: true, example: "mother" },

@@ -19,7 +19,7 @@ describe("bottom navigation matches spec §11.1", () => {
     ["branch_manager", ["today", "children", "add", "issues", "more"]],
     ["accountant", ["money", "invoices", "add", "month-close", "more"]],
     ["front_desk", ["today", "children", "payment", "cash-box", "more"]],
-    ["teacher", ["my-room", "roll-call", "incident", "more"]],
+    ["teacher", ["my-class", "roll-call", "incident", "more"]],
   ] as const)("%s", (role, expected) => {
     expect(sections(role)).toEqual(expected);
   });
@@ -49,7 +49,7 @@ describe("section access", () => {
 
   it("start screen is the first tab", () => {
     expect(homeSection("owner")).toBe("home");
-    expect(homeSection("teacher")).toBe("my-room");
+    expect(homeSection("teacher")).toBe("my-class");
   });
 });
 

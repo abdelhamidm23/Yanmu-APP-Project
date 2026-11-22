@@ -12,7 +12,8 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { CheckField, Field, PageHeader, SelectField } from "@/components/settings/Fields";
 import { ResultBanner } from "@/components/settings/ResultBanner";
-import { addAcademicYear, addException, addTerm, removeException, removeTerm, saveWorkingDays } from "./actions";
+import { addAcademicYear, addException, addTerm, removeException, removeTerm, saveHours, saveWorkingDays } from "./actions";
+import { stillInAlertTime } from "@/lib/attendance";
 
 export default async function CalendarPage({
   params,
@@ -40,6 +41,9 @@ export default async function CalendarPage({
   });
 
   const working = (data.settings.get("calendar.working_days") as Weekday[] | undefined) ?? ["sun", "mon", "tue", "wed", "thu"];
+  const opening = String(data.settings.get("attendance.opening_time") ?? "08:00");
+  const closing = String(data.settings.get("attendance.closing_time") ?? "16:00");
+  const afterSchool = Number(data.settings.get("attendance.after_school_minutes") ?? 60);
   // Branches this person may add holidays to: all for admins, managed branches for branch managers.
   const managed = admin
     ? data.branches
@@ -65,6 +69,25 @@ export default async function CalendarPage({
           </fieldset>
           {admin ? (
             <Button type="submit" variant="secondary" className="self-start">
+              {t("common.save")}
+            </Button>
+          ) : null}
+        </form>
+      </Card>
+
+      <Card data-testid="opening-hours">
+        <h2 className="text-section-title font-semibold">{t("calendar.hours")}</h2>
+        <p className="mt-1 text-meta text-muted">{t("calendar.hoursHelp")}</p>
+        <p className="figure mt-2 text-[14px] font-medium" data-testid="hours-summary">
+          {t("calendar.hoursSummary", { open: opening, close: closing, until: stillInAlertTime(closing, afterSchool) })}
+        </p>
+        <form action={saveHours} className="mt-3 grid gap-3 sm:grid-cols-4 sm:items-end">
+          <input type="hidden" name="locale" value={locale} />
+          <Field id="h-open" name="attendance.opening_time" type="time" label={t("calendar.opening")} defaultValue={opening} required disabled={!admin} dir="ltr" />
+          <Field id="h-close" name="attendance.closing_time" type="time" label={t("calendar.closing")} defaultValue={closing} required disabled={!admin} dir="ltr" />
+          <Field id="h-after" name="attendance.after_school_minutes" type="number" min={0} max={240} step={5} label={t("calendar.afterSchool")} defaultValue={afterSchool} required disabled={!admin} dir="ltr" />
+          {admin ? (
+            <Button type="submit" variant="secondary" data-testid="save-hours">
               {t("common.save")}
             </Button>
           ) : null}
