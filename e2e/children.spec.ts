@@ -163,7 +163,7 @@ test.describe("children (Phase 2)", () => {
     const sheet = async (badPhone: boolean) => {
       const wb = new ExcelJS.Workbook();
       const ws = wb.addWorksheet("Children");
-      ws.addRow(["Family ref", "Child name (Arabic)", "Child name (English)", "Date of birth", "Gender (female/male)", "Room", "Start date", "Guardian 1 name", "Guardian 1 relationship", "Guardian 1 phone", "Records consent signed on"]);
+      ws.addRow(["Family ref", "Child name (Arabic)", "Child name (English)", "Date of birth", "Gender (female/male)", "Class", "Start date", "Guardian 1 name", "Guardian 1 relationship", "Guardian 1 phone", "Records consent signed on"]);
       const s = stamp();
       ws.addRow(["1", "هنا", `E2E Hana ${s}`, isoMonthsAgo(30), "female", "Juniors 1", "2025-09-01", "E2E Dina", "mother", badPhone ? "12345" : "01012121212", "2025-08-20"]);
       ws.addRow(["1", "آدم", `E2E Adam ${s}`, isoMonthsAgo(40), "ذكر", "Seniors 1", "1/9/2025", "E2E Dina", "أم", "01012121212", ""]);

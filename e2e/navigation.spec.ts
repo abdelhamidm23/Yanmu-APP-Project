@@ -6,7 +6,7 @@ test("teacher sees the teacher tabs in Arabic", async ({ page }) => {
   await signIn(page, "teacher@yanmu.test", "ar");
   await expect(page).toHaveURL(/\/ar\/my-class$/);
   const nav = page.getByRole("navigation", { name: "التنقل الرئيسي" });
-  await expect(nav.getByRole("link")).toHaveText(["فصلي", "تسجيل الحضور", "حادث", "المزيد"]);
+  await expect(nav.getByRole("link")).toHaveText(["فصلي", "الحضور اليومي", "حادث", "المزيد"]);
   await expect(page.getByTestId("nav-my-class")).toHaveAttribute("aria-current", "page");
 });
 
@@ -16,9 +16,9 @@ test("branch manager sees the branch manager tabs and the + Add sheet", async ({
   const nav = page.getByRole("navigation", { name: "Main navigation" });
   await expect(nav.getByRole("link")).toHaveText(["Today", "Children", "Add", "Issues", "More"]);
   await page.getByTestId("nav-add").click();
-  // Phase 2: "Child" opens the add-child form; Phase 3: "Roll call" opens the rooms. The rest arrive in later phases.
+  // Phase 2: "Child" opens the add-child form; Phase 3: "Daily attendance" opens the classes. The rest arrive in later phases.
   await expect(page.getByTestId("add-actions").getByRole("button")).toHaveText(["Payment", "Expense", "Incident", "Issue"]);
-  await expect(page.getByTestId("add-actions").getByRole("link", { name: "Roll call" })).toHaveAttribute("href", "/en/roll-call");
+  await expect(page.getByTestId("add-actions").getByRole("link", { name: "Daily attendance" })).toHaveAttribute("href", "/en/roll-call");
   await page.getByTestId("add-child").click();
   await expect(page).toHaveURL(/\/en\/children\/new$/);
 });

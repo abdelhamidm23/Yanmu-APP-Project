@@ -79,7 +79,7 @@ The first release (MVP) covers: students and enrollment, guardians and authorize
 | D9 | **Critical incidents alert everyone at once; everything else goes step by step** | Section 10. |
 | D10 | Each **branch (nursery) manager** may spend up to **EGP 20,000** without asking, **unless the spending is unusual** | Section 8.6. |
 | D11 | Licensed capacity 100 and physical capacity 200, **per branch** | Occupancy is against 100; enrolling past 100 needs owner approval. |
-| D12 | Phone in every class | Roll call and sign-out run on class phones. |
+| D12 | Phone in every class | Daily attendance and sign-out run on class phones. |
 | D13 | Hikvision fingerprint device, one per branch | Staff attendance imported from its export (8.3). |
 
 ### 2.1 Age bands and staff ratios
@@ -125,7 +125,7 @@ Rules:
 | --- | --- |
 | Foundation | Login, MFA for privileged roles, branches, classes, age bands, academic calendar, roles scoped by branch, audit log, Arabic/English with RTL, settings |
 | Students | Child records, guardians, family accounts, authorized pickup, consent records, enrollment, transfer between branches, withdrawal, waitlist, restricted medical/allergy notes, age-band alerts |
-| Attendance | Class roll call on class phones, check-out to an approved adult, staff attendance import from fingerprint export, daily class roster, ratio check |
+| Attendance | Daily attendance on class phones, check-out to an approved adult, staff attendance import from fingerprint export, daily class roster, ratio check |
 | Finance | Fee lists with effective dates, legacy price locks, monthly invoice run, late fees, payments and receipts, payment allocation, credit notes, refunds, cash box, expenses with photos, approvals, month close, Excel export |
 | Safety | Incidents with severity, critical fan-out alerts, guardian notification record, actions, closure sign-off |
 | Operations | Issue tracker (maintenance, equipment, supplies) with priority and due dates |
@@ -285,7 +285,7 @@ PostgreSQL 16. All ids `uuid`. Every operational table has `branch_id` (except o
 - **Waitlist:** by age band and requested month; converting a waitlist entry pre-fills Add child.
 
 ### 8.2 Child attendance and pickup (class phones)
-- **Roll call:** class list with large tap targets; default "not yet marked"; one tap present / absent; "excused" with reason. Works offline (queue in IndexedDB, `client_uuid` idempotency).
+- **Daily attendance (was "roll call"):** class list with large tap targets; default "not yet marked"; one tap present / absent; "excused" with reason. Works offline (queue in IndexedDB, `client_uuid` idempotency).
 - **Check-out:** tap child → choose from approved pickup adults (photos shown) → confirm. An adult not on the list triggers: "Not approved — call the branch manager" and a same-day alert; never a silent release.
 - **QR pickup (owner, review of phases 0–3): not in this app for now.** Parents already use a separate app that gives each child a new pickup code every day, shown to the admin team at pickup. Check-out here stays by the approved-adults list.
 - **Hours (owner, review of phases 0–3):** Sunday to Thursday, 8 AM to 4 PM, then an after-school hour for late pickups (settings `attendance.opening_time`, `attendance.closing_time`, `attendance.after_school_minutes`). Children still checked in after the after-school time (5 PM) → alert to branch manager.
@@ -295,7 +295,7 @@ PostgreSQL 16. All ids `uuid`. Every operational table has `branch_id` (except o
 - Punches link to staff via `device_employee_no`; unknown numbers listed for mapping.
 - Derive per day: first in, last out, late (after shift start + grace), absent (scheduled, no punch, no approved leave).
 - The device model and a sample file are pending (F7). Hikvision terminals usually export attendance records to Excel through the device or Hikvision's PC software; confirm against the owner's sample before finalising the parser. A direct device connection is Phase 3 and only if the model supports it.
-- **Ratio check:** for each class, `required_carers = ceil(children_present / children_per_staff)` using the class's age band; `carers_present` = qualified carers on today's `room_roster` (manager adjusts the roster on the Today screen; a manual "present" tap is the fallback before the fingerprint upload). Snapshot at 10:00 and whenever roll call or roster changes. Breach = `carers_present < required_carers`.
+- **Ratio check:** for each class, `required_carers = ceil(children_present / children_per_staff)` using the class's age band; `carers_present` = qualified carers on today's `room_roster` (manager adjusts the roster on the Today screen; a manual "present" tap is the fallback before the fingerprint upload). Snapshot at 10:00 and whenever attendance or the roster changes. Breach = `carers_present < required_carers`.
 
 ### 8.4 Billing
 
@@ -389,7 +389,7 @@ All KPIs are SQL views over source tables (no typed-in numbers), filterable by b
 | Active children | Enrollments with status active on the date |
 | Occupancy | Active children ÷ licensed capacity (100 per branch); physical capacity (200) shown beside it |
 | Net enrollment, month | New starts − withdrawals; graduations shown apart |
-| Attendance today | Children present ÷ children expected (active, scheduled weekday, not excused); coverage = classes with roll call ÷ classes |
+| Attendance today | Children present ÷ children expected (active, scheduled weekday, not excused); coverage = classes with attendance taken ÷ classes |
 | Retention, term | Children active at term start still active at term end ÷ children active at term start (graduations excluded) |
 | Waitlist | Entries waiting, by age band and requested month |
 | Moving up / leaving soon | Children crossing a band within 30 days; reaching 4.5 within 60 days |
@@ -428,7 +428,7 @@ Ranked by severity, then age; max 4 rows on Home, rest in Inbox. Each row has on
 
 ### 9.7 Daily briefing (template sentences, never free text)
 Built from today's data with fixed templates, per branch or consolidated. Each sentence has a "not submitted" variant. Examples:
-- `Attendance is {pct}% ({present} of {expected} expected); {missing_rooms} has not taken its roll call.`
+- `Attendance is {pct}% ({present} of {expected} expected); {missing_rooms} has not taken today's attendance.`
 - `No incidents logged today — not confirmed until the {close_time} close.` / `No incidents today (confirmed).`
 - `{n} critical incident(s) open; waiting for your review.`
 - `EGP {collected} collected this month; {families} families are overdue.`
@@ -466,9 +466,9 @@ Arabic templates written separately (not machine-translated at runtime), feminin
 | Branch manager | Today | Children | + Add | Issues | More |
 | Accountant | Money | Invoices | + Add | Month close | More |
 | Front desk | Today | Children | + Payment | Cash box | More |
-| Teacher | My class | Roll call | + Incident | More | — |
+| Teacher | My class | Daily attendance | + Incident | More | — |
 
-"+ Add" sheet: Payment, Expense, Incident, Issue, Child, Roll call — filtered by permission.
+"+ Add" sheet: Payment, Expense, Incident, Issue, Child, Daily attendance — filtered by permission.
 
 ### 11.2 Owner Home (matches the concept mockup)
 Top to bottom:
@@ -495,7 +495,7 @@ Unified list: approvals, critical incidents to review or sign off, follow-ups. F
 Attendance by class (roll-call status), today's roster and ratio status per class, staff upload status, payments today, open incidents/issues, children moving up or leaving soon, consent flags, and the "Close the day" button (Section 8.9). The concept mockup shows the close-day screen: progress "5 of 7 checked", checked sections, "Incidents — Needs an answer — Yes, none / Log one", notes, submit button disabled until all sections answered.
 
 ### 11.7 Teacher — My class
-Class children with photos and allergy icon (details on tap), roll call, check-out flow, incident short form.
+Class children with photos and allergy icon (details on tap), daily attendance, check-out flow, incident short form.
 
 ### 11.8 More / Settings (owner, company manager)
 Users and roles · branches, classes, capacities · age bands and ratios · academic calendar and working days · fee lists and price locks · discount rules · expense categories and routine lists · approval limits and unusual-spending rules · alert rules and recipients · late-fee settings · imports · audit log · language · profile.
@@ -560,7 +560,7 @@ Use real `<button>`, `<a>`, `<label>`; icon-only buttons have `aria-label`; char
 | Auth | A maintained library with database sessions and TOTP MFA (e.g. Better Auth or Auth.js); per-person PIN on shared class phones |
 | Jobs | pg-boss (Postgres-backed): invoice run, late fees, snapshots, alerts, escalation timers, imports, PDFs |
 | Files | S3-compatible object storage (Huawei OBS on Huawei Cloud, or MinIO on a VPS) |
-| Offline | Service worker + IndexedDB queue for roll call, check-out and the incident short form |
+| Offline | Service worker + IndexedDB queue for daily attendance, check-out and the incident short form |
 | Charts | Recharts |
 | Excel | ExcelJS (import and export) |
 | PDF | HTML rendered by headless Chromium (Playwright) — Arabic shaping must be correct |
@@ -641,9 +641,9 @@ This is a product checklist, not legal advice; the owner should have Egyptian co
 - Money: invoice run (fee list, price lock, pro-rating), late-fee accrual across weekends and holidays, payment allocation, credit notes, cash variance — exact piastre results.
 - KPIs: each formula against a fixture with known answers, including "not submitted" and "confirmed zero".
 - RLS: every role × every table × other branch → denied.
-- Workflows (Playwright): add child → roll call → check-out; payment → receipt; unusual expense → approval chain; critical incident → fan-out → acknowledge → owner sign-off; daily close; month close import.
+- Workflows (Playwright): add child → daily attendance → check-out; payment → receipt; unusual expense → approval chain; critical incident → fan-out → acknowledge → owner sign-off; daily close; month close import.
 - Imports: malformed rows, duplicates, rollback.
-- Arabic RTL visual snapshots of Home, Today, roll call, payment.
+- Arabic RTL visual snapshots of Home, Today, daily attendance, payment.
 
 ### 17.2 Go-live gate (pilot at one branch, then both)
 1. The branch closes its day on ≥ 90% of working days for 2 weeks.
@@ -682,7 +682,7 @@ This is a product checklist, not legal advice; the owner should have Egyptian co
 | 0. Setup | Repo, `CLAUDE.md` (rules from 0.3), this spec copied to `docs/SPEC.md`, Docker dev environment, Postgres, auth with MFA, i18n + RTL shell, design tokens, bottom nav shells per role, CI with tests | Log in on a phone in Arabic and English |
 | 1. Foundation | Organization, branches, classes, age bands, calendar, users and roles, RLS, audit, settings screen | Create users and classes; see the audit log |
 | 2. Children | Families, guardians, children, consent, enrollment, transfer, withdrawal, waitlist, licence cap, age-band alerts, child import | Add and import children; try to exceed 100 |
-| 3. Attendance | Roll call (offline), check-out to approved adults, roster, Hikvision import with mapping, ratio checks | Take roll call on a class phone; upload a staff file |
+| 3. Attendance | Daily attendance (offline), check-out to approved adults, roster, Hikvision import with mapping, ratio checks | Take attendance on a class phone; upload a staff file |
 | 4. Money | Fee lists, price locks, invoice run, payments, receipts, late fees, credit notes, cash box, expenses, approvals | Run a month; record payments; see late fees accrue |
 | 5. Safety & ops | Incidents, critical fan-out, SMS + push, acknowledgement, actions, sign-off; issues; step escalation | Raise a test critical incident |
 | 6. Closing | Daily close, month close with Excel template, Excel exports, KPI views, daily snapshots, data status | Close a day; import a month close |
@@ -709,7 +709,7 @@ This is a product checklist, not legal advice; the owner should have Egyptian co
 | Not submitted | لم يُرسل |
 | Confirmed | مؤكَّد |
 | Close the day | إغلاق اليوم |
-| Roll call | تسجيل الحضور |
+| Daily attendance | الحضور اليومي |
 | Overdue tuition | رسوم متأخرة |
 | Late fee | غرامة تأخير |
 | Occupancy | نسبة الإشغال |
