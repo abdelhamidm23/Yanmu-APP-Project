@@ -8,6 +8,7 @@
  */
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   check,
   customType,
@@ -553,13 +554,23 @@ export const approvalRequest = pgTable(
     decidedBy: uuid("decided_by"),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
     decisionNote: text("decision_note"),
+    /** Money approvals (Phase 4, spec §8.6): the amount decides the route; step 2 is the owner's. */
+    amountPiastres: bigint("amount_piastres", { mode: "bigint" }),
+    expenseId: uuid("expense_id"),
+    creditNoteId: uuid("credit_note_id"),
+    currentStep: integer("current_step").notNull().default(1),
+    stepCount: integer("step_count").notNull().default(1),
     ...tracked,
   },
   (t) => [
     index("approval_request_branch_idx").on(t.branchId),
     index("approval_request_to_branch_idx").on(t.toBranchId),
-    check("approval_type_check", sql`${t.type} IN ('over_capacity', 'transfer')`),
-    check("approval_status_check", sql`${t.status} IN ('pending', 'approved', 'declined', 'cancelled')`),
+    index("approval_request_status_idx").on(t.status),
+    check(
+      "approval_type_check",
+      sql`${t.type} IN ('over_capacity', 'transfer', 'expense', 'credit_note', 'refund', 'late_fee_waiver')`,
+    ),
+    check("approval_status_check", sql`${t.status} IN ('pending', 'question', 'approved', 'declined', 'cancelled')`),
   ],
 );
 
@@ -826,4 +837,446 @@ export const ratioSnapshot = pgTable(
     createdBy: uuid("created_by").default(actorDefault),
   },
   (t) => [index("ratio_snapshot_room_idx").on(t.roomId, t.takenAt), index("ratio_snapshot_branch_idx").on(t.branchId, t.takenAt)],
+);
+
+// ---------------------------------------------------------------------------
+// Phase 4: money (spec §7.5, §8.4 to §8.6). Amounts are integer piastres in bigint (rule 5).
+// Posted invoices, payments, credit notes and expenses are never edited or deleted (rule 6):
+// the app may only insert them; voids, decisions and refunds go through database functions.
+// ---------------------------------------------------------------------------
+
+const money = (name: string) => bigint(name, { mode: "bigint" });
+const ITEM_TYPES = sql.raw("'tuition', 'registration', 'transport', 'service'");
+
+/** Fees per branch with the dates they apply (spec §7.5). */
+export const feeList = pgTable(
+  "fee_list",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    name: text("name").notNull(),
+    effectiveFrom: date("effective_from").notNull(),
+    effectiveTo: date("effective_to"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    index("fee_list_branch_idx").on(t.branchId),
+    check("fee_list_dates_check", sql`${t.effectiveTo} IS NULL OR ${t.effectiveTo} >= ${t.effectiveFrom}`),
+  ],
+);
+
+/** One fee in a list. No age band = every band. Tuition and service are billed monthly, registration once. */
+export const feeListItem = pgTable(
+  "fee_list_item",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    feeListId: uuid("fee_list_id")
+      .notNull()
+      .references(() => feeList.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    ageBandId: uuid("age_band_id").references(() => ageBand.id),
+    itemType: text("item_type").notNull(),
+    monthlyAmountPiastres: money("monthly_amount_piastres").notNull(),
+    ...tracked,
+  },
+  (t) => [
+    index("fee_list_item_list_idx").on(t.feeListId),
+    check("fee_list_item_type_check", sql`${t.itemType} IN (${ITEM_TYPES})`),
+    check("fee_list_item_amount_check", sql`${t.monthlyAmountPiastres} >= 0`),
+  ],
+);
+
+/** A child keeps an older price (spec §8.4.2, D7). Created by the company manager or owner. */
+export const priceLock = pgTable(
+  "price_lock",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => student.id, { onDelete: "cascade" }),
+    itemType: text("item_type").notNull().default("tuition"),
+    amountPiastres: money("amount_piastres").notNull(),
+    reason: text("reason").notNull(),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on"),
+    approvedBy: uuid("approved_by").default(actorDefault),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    index("price_lock_student_idx").on(t.studentId),
+    index("price_lock_branch_idx").on(t.branchId),
+    check("price_lock_type_check", sql`${t.itemType} IN (${ITEM_TYPES})`),
+    check("price_lock_amount_check", sql`${t.amountPiastres} >= 0`),
+    check("price_lock_dates_check", sql`${t.endsOn} IS NULL OR ${t.endsOn} >= ${t.startsOn}`),
+  ],
+);
+
+/** Discounts and offers (D6): the engine exists, no rule is active at launch. Percent is in basis points. */
+export const discountRule = pgTable(
+  "discount_rule",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    name: text("name").notNull(),
+    type: text("type").notNull(),
+    value: money("value").notNull(),
+    appliesTo: text("applies_to").notNull().default("tuition"),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on"),
+    isActive: boolean("is_active").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    index("discount_rule_branch_idx").on(t.branchId),
+    check("discount_rule_type_check", sql`${t.type} IN ('percent', 'amount')`),
+    check("discount_rule_applies_check", sql`${t.appliesTo} IN (${ITEM_TYPES})`),
+    check("discount_rule_value_check", sql`${t.value} > 0 AND (${t.type} <> 'percent' OR ${t.value} <= 10000)`),
+  ],
+);
+
+/** Optional monthly extras a child takes (transport, other services), billed only while switched on. */
+export const studentService = pgTable(
+  "student_service",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    studentId: uuid("student_id")
+      .notNull()
+      .references(() => student.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    itemType: text("item_type").notNull(),
+    startsOn: date("starts_on").notNull(),
+    endsOn: date("ends_on"),
+    ...tracked,
+  },
+  (t) => [
+    index("student_service_student_idx").on(t.studentId),
+    check("student_service_type_check", sql`${t.itemType} IN ('transport', 'service')`),
+  ],
+);
+
+/** Gap-free numbers per branch, kind and year (receipts, invoices, credit notes). */
+export const docSequence = pgTable(
+  "doc_sequence",
+  {
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    kind: text("kind").notNull(),
+    year: integer("year").notNull(),
+    nextNo: integer("next_no").notNull().default(1),
+  },
+  (t) => [primaryKey({ columns: [t.branchId, t.kind, t.year] })],
+);
+
+export const invoice = pgTable(
+  "invoice",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    familyId: uuid("family_id")
+      .notNull()
+      .references(() => family.id),
+    /** Empty only for a per-family late-fee invoice (late_fee.basis = per_family). */
+    studentId: uuid("student_id").references(() => student.id),
+    /** Set by the database: gap-free per branch and year. */
+    invoiceNo: text("invoice_no").notNull().default(""),
+    serviceMonth: date("service_month").notNull(),
+    issueDate: date("issue_date").notNull(),
+    dueDate: date("due_date").notNull(),
+    kind: text("kind").notNull().default("tuition"),
+    /** Kept by the database from the lines, allocations and credit notes. */
+    status: text("status").notNull().default("open"),
+    totalPiastres: money("total_piastres").notNull().default(sql`0`),
+    paidPiastres: money("paid_piastres").notNull().default(sql`0`),
+    creditedPiastres: money("credited_piastres").notNull().default(sql`0`),
+    /** Tuition: late fees have been worked out up to this day (spec §8.4.4). */
+    lateFeeThrough: date("late_fee_through"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    unique("invoice_no_unique").on(t.invoiceNo),
+    index("invoice_branch_month_idx").on(t.branchId, t.serviceMonth),
+    index("invoice_family_idx").on(t.familyId),
+    index("invoice_student_idx").on(t.studentId),
+    uniqueIndex("invoice_one_tuition_per_month").on(t.studentId, t.serviceMonth).where(sql`${t.kind} = 'tuition'`),
+    uniqueIndex("invoice_one_late_fee_per_child_month").on(t.studentId, t.serviceMonth).where(sql`${t.kind} = 'late_fee' AND ${t.studentId} IS NOT NULL`),
+    uniqueIndex("invoice_one_late_fee_per_family_month").on(t.familyId, t.serviceMonth).where(sql`${t.kind} = 'late_fee' AND ${t.studentId} IS NULL`),
+    check("invoice_kind_check", sql`${t.kind} IN ('tuition', 'late_fee', 'other')`),
+    check("invoice_status_check", sql`${t.status} IN ('open', 'part_paid', 'paid')`),
+    check("invoice_month_check", sql`extract(day from ${t.serviceMonth}) = 1`),
+  ],
+);
+
+export const invoiceLine = pgTable(
+  "invoice_line",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .references(() => invoice.id),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    itemType: text("item_type").notNull(),
+    description: text("description").notNull(),
+    quantity: integer("quantity").notNull().default(1),
+    unitPiastres: money("unit_piastres").notNull(),
+    amountPiastres: money("amount_piastres").notNull(),
+    source: text("source").notNull(),
+    /** Late-fee lines: the working day this line is for (one per day). */
+    accrualDate: date("accrual_date"),
+    ...tracked,
+  },
+  (t) => [
+    index("invoice_line_invoice_idx").on(t.invoiceId),
+    uniqueIndex("invoice_line_one_accrual_per_day").on(t.invoiceId, t.accrualDate).where(sql`${t.accrualDate} IS NOT NULL`),
+    check("invoice_line_type_check", sql`${t.itemType} IN (${ITEM_TYPES}, 'late_fee', 'other')`),
+    check("invoice_line_source_check", sql`${t.source} IN ('fee_list', 'price_lock', 'discount', 'late_fee', 'manual')`),
+  ],
+);
+
+/** Cash box for one branch and day (spec §8.5). */
+export const cashSession = pgTable(
+  "cash_session",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    date: date("date").notNull(),
+    openingFloatPiastres: money("opening_float_piastres").notNull(),
+    /** Frozen when the box is closed. */
+    cashInPiastres: money("cash_in_piastres"),
+    cashOutPiastres: money("cash_out_piastres"),
+    countedPiastres: money("counted_piastres"),
+    handedOverPiastres: money("handed_over_piastres"),
+    handedTo: text("handed_to"),
+    variancePiastres: money("variance_piastres"),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    closedBy: uuid("closed_by"),
+    reconciledAt: timestamp("reconciled_at", { withTimezone: true }),
+    reconciledBy: uuid("reconciled_by"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    unique("cash_session_branch_date_unique").on(t.branchId, t.date),
+    check("cash_session_float_check", sql`${t.openingFloatPiastres} >= 0`),
+  ],
+);
+
+export const payment = pgTable(
+  "payment",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    familyId: uuid("family_id")
+      .notNull()
+      .references(() => family.id),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+    method: text("method").notNull(),
+    reference: text("reference"),
+    amountPiastres: money("amount_piastres").notNull(),
+    /** Set by the database: gap-free per branch and year. */
+    receiptNo: text("receipt_no").notNull().default(""),
+    cashSessionId: uuid("cash_session_id").references(() => cashSession.id),
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
+    voidedBy: uuid("voided_by"),
+    voidReason: text("void_reason"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    unique("payment_receipt_no_unique").on(t.receiptNo),
+    index("payment_branch_received_idx").on(t.branchId, t.receivedAt),
+    index("payment_family_idx").on(t.familyId),
+    check("payment_method_check", sql`${t.method} IN ('cash', 'card', 'bank_transfer', 'instapay', 'wallet')`),
+    check("payment_amount_check", sql`${t.amountPiastres} > 0`),
+  ],
+);
+
+export const paymentAllocation = pgTable(
+  "payment_allocation",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    paymentId: uuid("payment_id")
+      .notNull()
+      .references(() => payment.id),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .references(() => invoice.id),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    amountPiastres: money("amount_piastres").notNull(),
+    ...tracked,
+  },
+  (t) => [
+    index("payment_allocation_payment_idx").on(t.paymentId),
+    index("payment_allocation_invoice_idx").on(t.invoiceId),
+    check("payment_allocation_amount_check", sql`${t.amountPiastres} > 0`),
+  ],
+);
+
+/** Corrections, refunds and late-fee waivers (spec §8.4.5). Count only once approved. */
+export const creditNote = pgTable(
+  "credit_note",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    invoiceId: uuid("invoice_id")
+      .notNull()
+      .references(() => invoice.id),
+    creditNo: text("credit_no"),
+    amountPiastres: money("amount_piastres").notNull(),
+    reason: text("reason").notNull(),
+    kind: text("kind").notNull(),
+    status: text("status").notNull().default("pending_approval"),
+    approvalRequestId: uuid("approval_request_id"),
+    /** Refunds: how and when the money went back to the family. */
+    refundMethod: text("refund_method"),
+    refundedAt: timestamp("refunded_at", { withTimezone: true }),
+    refundedBy: uuid("refunded_by"),
+    cashSessionId: uuid("cash_session_id").references(() => cashSession.id),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    unique("credit_note_no_unique").on(t.creditNo),
+    index("credit_note_invoice_idx").on(t.invoiceId),
+    index("credit_note_branch_idx").on(t.branchId),
+    check("credit_note_kind_check", sql`${t.kind} IN ('correction', 'refund', 'waiver')`),
+    check("credit_note_status_check", sql`${t.status} IN ('pending_approval', 'approved', 'rejected')`),
+    check("credit_note_amount_check", sql`${t.amountPiastres} > 0`),
+  ],
+);
+
+export const expenseCategory = pgTable(
+  "expense_category",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id),
+    key: text("key").notNull(),
+    nameAr: text("name_ar").notNull(),
+    nameEn: text("name_en").notNull(),
+    isRoutineDefault: boolean("is_routine_default").notNull().default(false),
+    sort: integer("sort").notNull().default(0),
+    ...tracked,
+  },
+  (t) => [unique("expense_category_key_unique").on(t.orgId, t.key)],
+);
+
+/** The categories a branch manager may spend on without asking (A2), per branch. */
+export const branchRoutineCategory = pgTable(
+  "branch_routine_category",
+  {
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => expenseCategory.id),
+    ...tracked,
+  },
+  (t) => [primaryKey({ columns: [t.branchId, t.categoryId] })],
+);
+
+export const vendor = pgTable(
+  "vendor",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organization.id),
+    name: text("name").notNull(),
+    phone: text("phone"),
+    ...tracked,
+  },
+  (t) => [uniqueIndex("vendor_name_unique").on(t.orgId, sql`lower(${t.name})`)],
+);
+
+export const expense = pgTable(
+  "expense",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => expenseCategory.id),
+    vendorId: uuid("vendor_id").references(() => vendor.id),
+    spentOn: date("spent_on").notNull(),
+    amountPiastres: money("amount_piastres").notNull(),
+    paymentMethod: text("payment_method").notNull(),
+    description: text("description").notNull(),
+    receiptAttachmentId: uuid("receipt_attachment_id").references(() => attachment.id),
+    /** Set by the database (spec §8.6): recorded (routine), pending_approval, approved, rejected, reversed. */
+    status: text("status").notNull().default("recorded"),
+    isUnusual: boolean("is_unusual").notNull().default(false),
+    /** Why it needs approval: not_routine, above_average, above_limit, flagged (comma-separated). */
+    unusualReason: text("unusual_reason"),
+    /** The person recording it said it is unusual, with their words. */
+    flaggedNote: text("flagged_note"),
+    /** A request made before spending, to be completed with the receipt. */
+    isRequest: boolean("is_request").notNull().default(false),
+    approvalRequestId: uuid("approval_request_id"),
+    cashSessionId: uuid("cash_session_id").references(() => cashSession.id),
+    /** A reversal entry points at the expense it cancels (rule 6). */
+    reversesExpenseId: uuid("reverses_expense_id"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    index("expense_branch_spent_idx").on(t.branchId, t.spentOn),
+    index("expense_category_idx").on(t.categoryId),
+    uniqueIndex("expense_one_reversal").on(t.reversesExpenseId).where(sql`${t.reversesExpenseId} IS NOT NULL`),
+    check("expense_status_check", sql`${t.status} IN ('recorded', 'pending_approval', 'approved', 'rejected', 'reversed')`),
+    check("expense_method_check", sql`${t.paymentMethod} IN ('cash', 'card', 'bank_transfer', 'instapay', 'wallet')`),
+    check("expense_amount_check", sql`${t.amountPiastres} <> 0 AND (${t.amountPiastres} > 0) = (${t.reversesExpenseId} IS NULL)`),
+  ],
+);
+
+/** One decision on a money approval (spec §7.7, §8.6). */
+export const approvalStep = pgTable(
+  "approval_step",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => approvalRequest.id),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    stepNo: integer("step_no").notNull(),
+    decision: text("decision").notNull(),
+    comment: text("comment"),
+    ...tracked,
+  },
+  (t) => [
+    index("approval_step_request_idx").on(t.requestId),
+    check("approval_step_decision_check", sql`${t.decision} IN ('approve', 'reject', 'recommend_approve', 'recommend_reject', 'question', 'answer')`),
+  ],
 );

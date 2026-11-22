@@ -28,6 +28,8 @@ function def<T>(d: SettingDef<T>) {
 export const SETTINGS = [
   def({ key: "billing.invoice_day", group: "billing", kind: "integer", schema: z.number().int().min(1).max(28), default: 1 }),
   def({ key: "billing.due_day", group: "billing", kind: "integer", schema: z.number().int().min(1).max(28), default: 5 }),
+  def({ key: "billing.prorate_new_starts", group: "billing", kind: "choice", schema: z.enum(["on", "off"]), default: "on", choices: ["on", "off"] }),
+  def({ key: "billing.preview_until", group: "billing", kind: "time", schema: time, default: "09:00" }),
   def({ key: "late_fee.daily_piastres", group: "billing", kind: "piastres", schema: piastres, default: 50000 }),
   def({ key: "late_fee.basis", group: "billing", kind: "choice", schema: z.enum(["per_invoice", "per_family"]), default: "per_invoice", choices: ["per_invoice", "per_family"] }),
   def({ key: "late_fee.cap_piastres", group: "billing", kind: "egp-nullable", schema: piastres.nullable(), default: null }),
