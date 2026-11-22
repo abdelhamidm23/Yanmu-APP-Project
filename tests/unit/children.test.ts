@@ -78,8 +78,8 @@ describe("phone numbers and names", () => {
 describe("child import rows (spec §8.11)", () => {
   const ctx: ImportContext = {
     rooms: [
-      { id: "r-tod", nameAr: "الدارجون ١", nameEn: "Toddlers 1", minAgeMonths: 12, maxAgeMonths: 24 },
-      { id: "r-sen", nameAr: "الكبار ١", nameEn: "Seniors 1", minAgeMonths: 36, maxAgeMonths: 54 },
+      { id: "r-tod", nameAr: "تودلرز ١", nameEn: "Toddlers 1", minAgeMonths: 12, maxAgeMonths: 24 },
+      { id: "r-sen", nameAr: "سينيورز ١", nameEn: "Seniors 1", minAgeMonths: 36, maxAgeMonths: 54 },
     ],
     today: "2026-11-18",
     existing: [{ fullNameAr: "عمر علي", fullNameEn: "Omar Ali", dateOfBirth: "2023-02-01" }],

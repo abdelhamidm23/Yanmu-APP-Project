@@ -25,15 +25,21 @@ if (!org) {
     .returning();
 }
 
-// Arabic labels are the spec's suggestions and editable in Settings (spec §2.1 note).
+// Arabic labels are editable in Settings (spec §2.1 note). Owner, 2026-11-22: write the English
+// names in Arabic letters (جونيورز), not translations. oldAr is the earlier suggested label, which is
+// replaced only if nobody has changed it since.
 const bands = [
-  { key: "babies", nameAr: "الرُّضّع", nameEn: "Babies", minAgeMonths: 3, maxAgeMonths: 12, childrenPerStaff: 3, sort: 1 },
-  { key: "toddlers", nameAr: "الدارجون", nameEn: "Toddlers", minAgeMonths: 12, maxAgeMonths: 24, childrenPerStaff: 4, sort: 2 },
-  { key: "juniors", nameAr: "البراعم", nameEn: "Juniors", minAgeMonths: 24, maxAgeMonths: 36, childrenPerStaff: 6, sort: 3 },
-  { key: "seniors", nameAr: "الكبار", nameEn: "Seniors", minAgeMonths: 36, maxAgeMonths: 54, childrenPerStaff: 6, sort: 4 },
+  { key: "babies", nameAr: "بيبيز", oldAr: "الرُّضّع", nameEn: "Babies", minAgeMonths: 3, maxAgeMonths: 12, childrenPerStaff: 3, sort: 1 },
+  { key: "toddlers", nameAr: "تودلرز", oldAr: "الدارجون", nameEn: "Toddlers", minAgeMonths: 12, maxAgeMonths: 24, childrenPerStaff: 4, sort: 2 },
+  { key: "juniors", nameAr: "جونيورز", oldAr: "البراعم", nameEn: "Juniors", minAgeMonths: 24, maxAgeMonths: 36, childrenPerStaff: 6, sort: 3 },
+  { key: "seniors", nameAr: "سينيورز", oldAr: "الكبار", nameEn: "Seniors", minAgeMonths: 36, maxAgeMonths: 54, childrenPerStaff: 6, sort: 4 },
 ];
-for (const b of bands) {
+for (const { oldAr, ...b } of bands) {
   await db.insert(schema.ageBand).values({ orgId: org.id, ...b }).onConflictDoNothing();
+  await db
+    .update(schema.ageBand)
+    .set({ nameAr: b.nameAr })
+    .where(and(eq(schema.ageBand.orgId, org.id), eq(schema.ageBand.key, b.key), eq(schema.ageBand.nameAr, oldAr)));
 }
 
 const branches = [

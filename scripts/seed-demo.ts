@@ -61,25 +61,26 @@ const FAMILIES: [string, string][] = [
 const ALLERGIES = ["Peanuts", "Milk", "Eggs", "Penicillin", "Dust"];
 
 // Classes per branch: [band key, English name, Arabic name, capacity, children]
+// Owner, 2026-11-22: Arabic class names are the English names written in Arabic letters (جونيورز ٢), not translations.
 const PLAN: Record<"A" | "B", [string, string, string, number, number][]> = {
   A: [
-    ["babies", "Babies 1", "الرضع ١", 9, 9],
-    ["toddlers", "Toddlers 1", "الدارجون ١", 12, 11],
-    ["juniors", "Juniors 1", "البراعم ١", 22, 20],
+    ["babies", "Babies 1", "بيبيز ١", 9, 9],
+    ["toddlers", "Toddlers 1", "تودلرز ١", 12, 11],
+    ["juniors", "Juniors 1", "جونيورز ١", 22, 20],
     // Owner, 2026-11-22: Yanmu's second toddler class became "Juniors 2".
-    ["juniors", "Juniors 2", "البراعم ٢", 12, 11],
-    ["seniors", "Seniors 1", "الكبار ١", 22, 21],
-    ["seniors", "Seniors 2", "الكبار ٢", 22, 20],
+    ["juniors", "Juniors 2", "جونيورز ٢", 12, 11],
+    ["seniors", "Seniors 1", "سينيورز ١", 22, 21],
+    ["seniors", "Seniors 2", "سينيورز ٢", 22, 20],
   ],
   B: [
-    ["babies", "Babies 1", "الرضع ١", 9, 6],
-    ["toddlers", "Toddlers 1", "الدارجون ١", 12, 12],
-    ["toddlers", "Toddlers 2", "الدارجون ٢", 12, 5],
-    ["juniors", "Juniors 1", "البراعم ١", 18, 9],
-    ["juniors", "Juniors 2", "البراعم ٢", 18, 9],
-    ["seniors", "Seniors 1", "الكبار ١", 18, 7],
-    ["seniors", "Seniors 2", "الكبار ٢", 18, 7],
-    ["seniors", "Seniors 3", "الكبار ٣", 18, 6],
+    ["babies", "Babies 1", "بيبيز ١", 9, 6],
+    ["toddlers", "Toddlers 1", "تودلرز ١", 12, 12],
+    ["toddlers", "Toddlers 2", "تودلرز ٢", 12, 5],
+    ["juniors", "Juniors 1", "جونيورز ١", 18, 9],
+    ["juniors", "Juniors 2", "جونيورز ٢", 18, 9],
+    ["seniors", "Seniors 1", "سينيورز ١", 18, 7],
+    ["seniors", "Seniors 2", "سينيورز ٢", 18, 7],
+    ["seniors", "Seniors 3", "سينيورز ٣", 18, 6],
   ],
 };
 
@@ -89,12 +90,12 @@ const today = todayInCairo();
 /** True when the classes in use and their demo children already match PLAN (so a running demo is left alone). */
 async function layoutMatches(): Promise<boolean> {
   const rows = (await db.execute(sql`
-    select b.code, r.name_en as "name", count(e.id)::int as "n"
+    select b.code, r.name_en || '/' || r.name_ar as "name", count(e.id)::int as "n"
     from room r join branch b on b.id = r.branch_id
     left join enrollment e on e.room_id = r.id and e.is_demo and e.status = 'active'
     where r.is_active and b.code in ('A', 'B')
-    group by b.code, r.name_en`)) as unknown as { code: "A" | "B"; name: string; n: number }[];
-  const want = (["A", "B"] as const).flatMap((code) => PLAN[code].map(([, name, , , count]) => `${code}|${name}|${count}`)).sort();
+    group by b.code, r.name_en, r.name_ar`)) as unknown as { code: "A" | "B"; name: string; n: number }[];
+  const want = (["A", "B"] as const).flatMap((code) => PLAN[code].map(([, nameEn, nameAr, , count]) => `${code}|${nameEn}/${nameAr}|${count}`)).sort();
   const have = rows.map((r) => `${r.code}|${r.name}|${r.n}`).sort();
   return want.length === have.length && want.every((w, i) => w === have[i]);
 }

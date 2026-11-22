@@ -84,14 +84,14 @@ The first release (MVP) covers: students and enrollment, guardians and authorize
 
 ### 2.1 Age bands and staff ratios
 
-| Band (EN) | Suggested Arabic label* | Age range | Staff : children |
+| Band (EN) | Arabic label* | Age range | Staff : children |
 | --- | --- | --- | --- |
-| Babies | الرُّضّع | 3 to < 12 months | 1 : 3 |
-| Toddlers | الدارجون | 12 to < 24 months | 1 : 4 |
-| Juniors | البراعم | 24 to < 36 months | 1 : 6 |
-| Seniors | الكبار | 36 to 54 months (4.5 years) | 1 : 6 |
+| Babies | بيبيز | 3 to < 12 months | 1 : 3 |
+| Toddlers | تودلرز | 12 to < 24 months | 1 : 4 |
+| Juniors | جونيورز | 24 to < 36 months | 1 : 6 |
+| Seniors | سينيورز | 36 to 54 months (4.5 years) | 1 : 6 |
 
-\*Arabic labels are editable settings; confirm with the owner.
+\*Arabic labels are editable settings. Owner, 2026-11-22: band and class names are the English names written in Arabic letters (e.g. جونيورز ٢), not translated.
 
 Rules:
 - A child's band comes from date of birth. Enrollment of a child under 3 months is blocked.
