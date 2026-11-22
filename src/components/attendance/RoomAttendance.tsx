@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { applyEvent, attendanceSummary, type AttendanceEvent, type AttendanceStatus, type DayRecord } from "@/lib/attendance";
 import { enqueue, flush, loadRoom, newUuid, queued, saveRoom } from "@/lib/offline-queue";
-import { Avatar } from "./Avatar";
 
 export interface PickupAdult {
   id: string;
@@ -41,6 +40,22 @@ function withoutMedical(c: AttendanceChild): Omit<AttendanceChild, "medical"> {
 function stamps(count: number): string[] {
   const now = Date.now();
   return Array.from({ length: count }, (_, i) => new Date(now + i).toISOString());
+}
+
+function Avatar({ photoId, name, size = 44 }: { photoId: string | null; name: string; size?: number }) {
+  const initials = name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("");
+  return photoId ? (
+    // eslint-disable-next-line @next/next/no-img-element -- private files served under row-level security
+    <img src={`/api/attachment/${photoId}`} alt="" width={size} height={size} className="shrink-0 rounded-full border border-border object-cover" style={{ inlineSize: size, blockSize: size }} />
+  ) : (
+    <span aria-hidden className="inline-flex shrink-0 items-center justify-center rounded-full bg-brand-tint font-semibold text-brand" style={{ inlineSize: size, blockSize: size }}>
+      {initials}
+    </span>
+  );
 }
 
 const time = (iso: string | null, locale: string) =>
@@ -410,8 +425,7 @@ export function RoomAttendance({
                   return (
                     <li key={k.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-[14px]">
                       <span className="font-medium">{k.name}</span>
-                      <span className="figure text-muted">{t("collectedBy", { adult: adult?.fullName ?? "—", time: time(k.day.checkOutAt, locale) })}
-                        {k.day.checkOutVia === "qr" ? ` · ${t("viaQr")}` : ""}</span>
+                      <span className="figure text-muted">{t("collectedBy", { adult: adult?.fullName ?? "—", time: time(k.day.checkOutAt, locale) })}</span>
                     </li>
                   );
                 })}

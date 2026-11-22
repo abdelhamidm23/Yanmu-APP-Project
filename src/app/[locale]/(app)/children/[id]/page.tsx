@@ -1,11 +1,10 @@
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { withUserDb } from "@/db/rls";
 import { branchDirectory, branchRooms } from "@/db/children";
-import { approvalRequest, consentRecord, enrollment, family, guardian, pickupCard, room, student, studentGuardian, studentMedical } from "@/db/schema";
-import { NewCodeTodayButton, PickupLinkControl } from "./PickupLinkControl";
+import { approvalRequest, consentRecord, enrollment, family, guardian, room, student, studentGuardian, studentMedical } from "@/db/schema";
 import { requireChildren } from "@/lib/require-user";
 import { canBreakGlass, canEditChildren, canEditMedical } from "@/lib/permissions";
 import { CONSENT_PURPOSES, RELATIONSHIPS, WITHDRAW_REASONS, ageInMonths, childAlerts } from "@/lib/children";
@@ -57,12 +56,6 @@ export default async function ChildPage({
       .innerJoin(guardian, eq(guardian.id, studentGuardian.guardianId))
       .where(eq(studentGuardian.studentId, id))
       .orderBy(desc(studentGuardian.isPrimaryContact), asc(guardian.fullName));
-    const cards = guardians.length
-      ? await tx
-          .select({ guardianId: pickupCard.guardianId, since: pickupCard.createdAt })
-          .from(pickupCard)
-          .where(and(inArray(pickupCard.guardianId, guardians.map((g) => g.id)), isNull(pickupCard.revokedAt)))
-      : [];
     const [medical] = await tx.select().from(studentMedical).where(eq(studentMedical.studentId, id));
     const consents = await tx.select().from(consentRecord).where(eq(consentRecord.studentId, id)).orderBy(desc(consentRecord.grantedOn));
     const enrollments = await tx
@@ -75,10 +68,10 @@ export default async function ChildPage({
       .select()
       .from(approvalRequest)
       .where(and(eq(approvalRequest.studentId, id), eq(approvalRequest.status, "pending")));
-    return { s, fam, guardians, cards, medical, consents, enrollments, requests, rooms: await branchRooms(tx, s.branchId), directory: await branchDirectory(tx) };
+    return { s, fam, guardians, medical, consents, enrollments, requests, rooms: await branchRooms(tx, s.branchId), directory: await branchDirectory(tx) };
   });
   if (!data) notFound();
-  const { s, fam, guardians, cards, medical, consents, enrollments, requests, rooms, directory } = data;
+  const { s, fam, guardians, medical, consents, enrollments, requests, rooms, directory } = data;
 
   const canEdit = canEditChildren(user, s.branchId);
   const medicalEditor = canEditMedical(user, s.branchId);
@@ -164,23 +157,9 @@ export default async function ChildPage({
                   </form>
                 ) : null}
               </span>
-              {g.canPickUp && canEdit ? (
-                <div className="basis-full">
-                  <PickupLinkControl
-                    locale={locale}
-                    studentId={id}
-                    guardianId={g.id}
-                    inUseSince={(() => {
-                      const c = cards.find((x) => x.guardianId === g.id);
-                      return c ? d(todayInCairo(c.since)) : null;
-                    })()}
-                  />
-                </div>
-              ) : null}
             </li>
           ))}
         </ul>
-        {canEdit && guardians.some((g) => g.canPickUp) ? <NewCodeTodayButton locale={locale} studentId={id} /> : null}
         {canEdit ? (
           <details>
             <summary className="min-h-11 cursor-pointer py-2 font-medium text-brand">{t("detail.addGuardian")}</summary>

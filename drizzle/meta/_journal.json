@@ -54,29 +54,8 @@
     {
       "idx": 7,
       "version": "7",
-      "when": 1795098684804,
-      "tag": "0007_pickup_cards",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1795098693687,
-      "tag": "0008_pickup_cards_rls",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1795108394396,
-      "tag": "0009_daily_pickup_codes",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1795108395441,
-      "tag": "0010_daily_pickup_codes_rls",
+      "when": 1795338145444,
+      "tag": "0007_remove_qr_pickup",
       "breakpoints": true
     }
   ]

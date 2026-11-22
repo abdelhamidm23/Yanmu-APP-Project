@@ -16,7 +16,7 @@ export function eventDateAllowed(date: string, today = todayInCairo()): boolean 
  * (spec §8.2 offline queue). Row-level security and the database triggers make the final decisions:
  * a teacher outside the room, or a check-out to someone not on the list, is rejected there too.
  */
-export async function applyAttendanceEvents(tx: Tx, events: AttendanceEvent[], opts: { qrChecked?: boolean } = {}) {
+export async function applyAttendanceEvents(tx: Tx, events: AttendanceEvent[]) {
   const results: EventResult[] = [];
   const days = new Map<string, DayRecord>();
   const rooms = new Set<string>();
@@ -49,12 +49,9 @@ export async function applyAttendanceEvents(tx: Tx, events: AttendanceEvent[], o
               checkInAt: row.checkInAt?.toISOString() ?? null,
               checkOutAt: row.checkOutAt?.toISOString() ?? null,
               collectedByGuardianId: row.collectedByGuardianId,
-              checkOutVia: (row.checkOutMethod as DayRecord["checkOutVia"]) ?? null,
               clientAt: row.clientAt?.toISOString() ?? null,
             }
           : EMPTY_DAY;
-        // A QR check-out is only taken from the scan screen, after the server has checked the child's code.
-        if (ev.kind === "checkout" && ev.via === "qr" && !opts.qrChecked) return { result: "rejected" as const, code: "qr_not_checked" };
         const next = applyEvent(before, ev);
         if ("error" in next) return { result: "rejected" as const, code: next.error };
         if (next.result === "stale") return { result: "stale" as const };
@@ -65,7 +62,6 @@ export async function applyAttendanceEvents(tx: Tx, events: AttendanceEvent[], o
           checkInAt: next.day.checkInAt ? new Date(next.day.checkInAt) : null,
           checkOutAt: next.day.checkOutAt ? new Date(next.day.checkOutAt) : null,
           collectedByGuardianId: next.day.collectedByGuardianId,
-          checkOutMethod: next.day.checkOutAt ? (next.day.checkOutVia ?? "list") : null,
           clientUuid: ev.clientUuid,
           clientAt: new Date(ev.at),
         };

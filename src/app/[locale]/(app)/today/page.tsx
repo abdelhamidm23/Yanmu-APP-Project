@@ -16,7 +16,6 @@ import { buttonClasses } from "@/components/ui/Button";
 import { PageHeader } from "@/components/settings/Fields";
 import { ResultBanner } from "@/components/settings/ResultBanner";
 import { BranchTabs, Flag, pickBranch } from "@/components/children/BranchTabs";
-import { PickupScan } from "@/components/attendance/PickupScan";
 import { acknowledgeRefusal } from "./actions";
 
 /** Branch manager / front desk — Today (spec §11.6). Phase 3 parts: roll call, ratios, roster, staff file, pickups. */
@@ -80,8 +79,6 @@ export default async function TodayPage({
       <PageHeader title={t("title")} help={`${localName(b, locale)} · ${formatPlainDate(date, loc, user.digits)}`} />
       <BranchTabs branches={branches} current={b.id} path="/today" locale={locale} label={t("branch")} />
       <ResultBanner searchParams={sp} />
-
-      <PickupScan locale={locale} branchId={b.id} />
 
       {openRefusalsCount ? (
         <Card className="flex flex-col gap-2 border-critical" data-testid="refusals">

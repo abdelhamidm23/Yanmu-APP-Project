@@ -1,1 +1,0 @@
-ALTER TABLE "student" ADD COLUMN "pickup_code_version" integer DEFAULT 0 NOT NULL;

@@ -28,8 +28,6 @@ export const attendanceEventSchema = z.discriminatedUnion("kind", [
     studentId: z.uuid(),
     date: z.iso.date(),
     guardianId: z.uuid(),
-    /** "qr" when the adult's QR pickup card was scanned; otherwise picked from the approved list. */
-    via: z.enum(["list", "qr"]).optional(),
   }),
   z.object({
     kind: z.literal("refusal"),
@@ -54,8 +52,6 @@ export interface DayRecord {
   checkInAt: string | null;
   checkOutAt: string | null;
   collectedByGuardianId: string | null;
-  /** How the adult was checked at pickup. */
-  checkOutVia?: "list" | "qr" | null;
   clientAt: string | null;
 }
 
@@ -84,7 +80,7 @@ export function applyEvent(day: DayRecord, ev: AttendanceEvent): { day: DayRecor
   }
   if (day.status !== "present") return { error: "not_checked_in" };
   if (day.checkOutAt) return { error: "already_checked_out" };
-  return { day: { ...day, checkOutAt: ev.at, collectedByGuardianId: ev.guardianId, checkOutVia: ev.via ?? "list", clientAt: ev.at }, result: "applied" };
+  return { day: { ...day, checkOutAt: ev.at, collectedByGuardianId: ev.guardianId, clientAt: ev.at }, result: "applied" };
 }
 
 /** Spec §8.3: required_carers = ceil(children_present / children_per_staff). */

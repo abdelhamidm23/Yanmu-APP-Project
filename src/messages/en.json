@@ -443,7 +443,7 @@
         "student_attendance": "Child attendance",
         "pickup_refusal": "Refused pickups",
         "import_mapping": "Import column choices",
-        "pickup_card": "Pickup link"
+        "pickup_card": "Pickup link (removed)"
       },
       "fields": {
         "full_name": "Name",
@@ -722,26 +722,7 @@
       "withdraw": "Withdraw from the nursery",
       "withdrawHelp": "Choose the last day and the reason. Refunds of unused days will come with the money screens.",
       "lastDay": "Last day",
-      "confirmWithdraw": "Withdraw child",
-      "linkNone": "No pickup link yet",
-      "linkInUse": "Pickup link in use since {date}",
-      "linkMake": "Make pickup link",
-      "linkReplace": "Make a new link",
-      "linkCancel": "Cancel link",
-      "linkReplaceConfirm": "The link in use will stop working at once. Make a new link?",
-      "linkCancelConfirm": "Cancel this pickup link? It will stop working at once.",
-      "linkNeedsPickup": "Only an adult who may collect this child can have a pickup link.",
-      "linkError": "Could not save. Try again.",
-      "linkGiveHelp": "Give this link to the adult now: they scan this QR with their phone camera, or you send them the link. It opens today's pickup code for every child they may collect, with a new code each day. For safety the link is not shown again; if a phone is lost, make a new link.",
-      "linkQrLabel": "QR that opens the pickup link",
-      "linkUrlLabel": "Pickup link",
-      "linkCopy": "Copy link",
-      "linkCopied": "Copied",
-      "linkDone": "Done",
-      "codeHelp": "Each child has a new pickup code every day. If today's code was sent to the wrong person, give the child a new code: the old one stops working at once.",
-      "codeNew": "New code for today",
-      "codeNewConfirm": "Give this child a new pickup code for today? Today's code will stop working at once.",
-      "codeNewDone": "Done. Pickup links now show the new code."
+      "confirmWithdraw": "Withdraw child"
     },
     "waitlistPage": {
       "title": "Waitlist",
@@ -869,8 +850,7 @@
       "already_checked_out": "The child has already gone home.",
       "unknown": "Something went wrong. Try again.",
       "duplicate": "Already recorded.",
-      "invalid": "This tap could not be read.",
-      "qr_not_checked": "A pickup QR can only be used from the scan screen."
+      "invalid": "This tap could not be read."
     },
     "signedOut": "You were signed out. Sign in again and your saved taps will be sent.",
     "sending": "{count, plural, one {Sending 1 tap…} other {Sending # taps…}}",
@@ -925,13 +905,7 @@
     "rollDone": "Done: {present} of {enrolled} present",
     "rollPartial": "{marked} of {enrolled} marked",
     "myRoomTitle": "My class",
-    "noAssignedRoom": "You are not assigned to a class yet. Ask the branch manager (Settings → Users → classes).",
-    "scanHelp": "Point the back camera at the child's pickup QR (on the parent's phone or a screenshot).",
-    "scanTyped": "Camera not working? Type the code shown under the QR",
-    "scanCheck": "Check",
-    "scanClose": "Close camera",
-    "cameraBlocked": "The camera did not open. Allow the camera for this site, or type the code.",
-    "viaQr": "pickup QR"
+    "noAssignedRoom": "You are not assigned to a class yet. Ask the branch manager (Settings → Users → classes)."
   },
   "today": {
     "title": "Today",
@@ -981,25 +955,7 @@
     "presentNo": "No, not here",
     "save": "Save",
     "andMore": "and {n} more",
-    "earlierBreaches": "{count, plural, one {Below the ratio earlier today:} other {Below the ratio earlier today (#):}} {rooms}",
-    "scanTitle": "Pickup QR",
-    "scanIntro": "Scan the child's pickup QR from the parent's phone or screenshot. Each child has a new code every day.",
-    "scanButton": "Scan pickup QR",
-    "scanUnknown": "This code is not recognised for this branch. Do not hand over a child. Check the approved list or call the branch manager.",
-    "scanOld": "This is an old code for {child} (from yesterday, or replaced today). Ask for today's code, or check the approved list.",
-    "scanCodeOk": "Today's code",
-    "scanClassLine": "Class: {name}",
-    "scanNotIn": "{child} was not marked present today, so they cannot be handed over here.",
-    "scanGone": "{child} already went home at {time} with {adult}.",
-    "scanGoneUnknownAdult": "{child} already went home at {time}.",
-    "scanWho": "Who is collecting?",
-    "scanFace": "Check the face against the photo before you hand over.",
-    "scanNoAdults": "Nobody is approved to collect this child. Do not hand over. Call the branch manager.",
-    "scanNotOnList": "Person not on this list? Do not hand over. Call the branch manager.",
-    "scanHandOver": "Hand over",
-    "scanDone": "{child} handed over to {adult}.",
-    "scanAgain": "Scan another",
-    "scanCancel": "Cancel"
+    "earlierBreaches": "{count, plural, one {Below the ratio earlier today:} other {Below the ratio earlier today (#):}} {rooms}"
   },
   "staffAttendance": {
     "title": "Staff attendance",
@@ -1129,14 +1085,5 @@
       "firstIn": "First in",
       "lastOut": "Last out"
     }
-  },
-  "pickupPage": {
-    "title": "Pickup code",
-    "intro": "Show this screen, or a screenshot of it, at the front desk when you collect. There is a new code every day.",
-    "for": "For {adult}",
-    "date": "Today, {date}",
-    "codeLabel": "Code",
-    "keepPrivate": "Do not share this page. Anyone with today's code can be asked to show ID. If your phone is lost, tell the nursery.",
-    "none": "This link is not in use any more. Ask the nursery for a new one."
   }
 }
