@@ -14,6 +14,16 @@ import {
   canViewStaffAttendance,
   canViewWaitlist,
   isOrgAdmin,
+  canViewMoney,
+  canRecordPayment,
+  canRunInvoices,
+  canDecideMoney,
+  canRequestCredit,
+  canViewExpenses,
+  canRecordExpense,
+  canUseCashBox,
+  canReconcileCash,
+  canEditFees,
 } from "./permissions";
 import { getCurrentUser, type CurrentUser } from "./session";
 
@@ -71,6 +81,25 @@ export async function requireArea(
     : area === "staff" ? canViewStaff(user)
     : area === "staff-attendance" ? canViewStaffAttendance(user)
     : canImportPunches(user);
+  if (!allowed) notFound();
+  return user;
+}
+
+/** Money screens (spec §5, Phase 4). Row-level security narrows the branches and rows. */
+export async function requireMoney(
+  locale: string,
+  area: "view" | "payment" | "run" | "inbox" | "expenses" | "expense-new" | "cash" | "fees",
+): Promise<CurrentUser & { activeRole: Role | null }> {
+  const user = await requireUser(locale);
+  const allowed =
+    area === "view" ? canViewMoney(user)
+    : area === "payment" ? canRecordPayment(user)
+    : area === "run" ? canRunInvoices(user)
+    : area === "inbox" ? canDecideMoney(user) || canRequestCredit(user) || canRecordExpense(user)
+    : area === "expenses" ? canViewExpenses(user)
+    : area === "expense-new" ? canRecordExpense(user)
+    : area === "cash" ? canUseCashBox(user) || canReconcileCash(user) || canDecideMoney(user)
+    : canEditFees(user);
   if (!allowed) notFound();
   return user;
 }

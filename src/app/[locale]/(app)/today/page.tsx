@@ -4,8 +4,11 @@ import { withUserDb } from "@/db/rls";
 import { visibleBranches } from "@/db/children";
 import { branchRoomsToday, lastPunchImport, openRefusals, roomsBreachedSince, stillCheckedIn } from "@/db/attendance";
 import { readOrgSettings } from "@/db/settings";
+import { accrueLateFees } from "@/db/billing";
+import { cashVarianceAlerts, moneySummary } from "@/db/money";
+import { Amount } from "@/components/money/Money";
 import { requireArea } from "@/lib/require-user";
-import { canEditRoster, canImportPunches, hasRoleIn } from "@/lib/permissions";
+import { canEditRoster, canImportPunches, canRecordPayment, canUseCashBox, canViewMoney, hasRoleIn } from "@/lib/permissions";
 import { stillInAlertTime } from "@/lib/attendance";
 import { cairoTimeOf, cairoWallToUtc, minutesOf, todayInCairo } from "@/lib/calendar";
 import { formatNumber, formatPlainDate, formatTimestamp } from "@/lib/format";
@@ -49,7 +52,12 @@ export default async function TodayPage({
       readOrgSettings(tx),
       manager ? roomsBreachedSince(tx, b.id, startOfDay) : Promise.resolve([] as string[]),
     ]);
-    return { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, until: stillInAlertTime(String(settings.get("attendance.closing_time") ?? "16:00"), Number(settings.get("attendance.after_school_minutes") ?? 60)) };
+    let money = null;
+    if (canViewMoney(user, b.id)) {
+      await accrueLateFees(tx, b.id, date);
+      money = { s: await moneySummary(tx, b.id, date), cashAlerts: await cashVarianceAlerts(tx, b.id, date) };
+    }
+    return { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, money, until: stillInAlertTime(String(settings.get("attendance.closing_time") ?? "16:00"), Number(settings.get("attendance.after_school_minutes") ?? 60)) };
   });
   if (!data) {
     return (
@@ -59,7 +67,8 @@ export default async function TodayPage({
       </div>
     );
   }
-  const { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, until } = data;
+  const { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, until, money } = data;
+  const tm = await getTranslations("money");
   const present = rooms.reduce((s, r) => s + r.present, 0);
   // Rule 1: children not marked yet are not counted as absent; the roll-call line shows what is missing.
   const expected = rooms.reduce((s, r) => s + r.present + r.absent, 0);
@@ -189,6 +198,33 @@ export default async function TodayPage({
                 {t("uploadStaffFile")}
               </Link>
             ) : null}
+          </div>
+        </Card>
+      ) : null}
+
+      {money ? (
+        <Card className="flex flex-col gap-2" data-testid="money-today">
+          <h2 className="text-section-title font-semibold">{tm("todayTitle")}</h2>
+          {money.cashAlerts.map((c) => (
+            <Alert key={c.id}>
+              {tm("cash.varianceAlertDay", { date: formatPlainDate(c.date, loc, user.digits) })}{" "}
+              <Amount value={BigInt(c.variance) < 0n ? -BigInt(c.variance) : BigInt(c.variance)} locale={locale} digits={user.digits} />
+            </Alert>
+          ))}
+          <p className="text-[14px]">
+            {tm("paymentsToday", { n: n(money.s.paymentsToday.count) })}:{" "}
+            <Amount value={money.s.paymentsToday.total} locale={locale} digits={user.digits} className="font-semibold" />
+          </p>
+          <p className="text-[14px]">{tm(`cashState.${money.s.cashBox}`)}</p>
+          {money.s.lateFees.todayFamilies ? (
+            <p className="text-[14px] text-attention">
+              {tm("lateTodayLine", { n: n(money.s.lateFees.todayFamilies) })}{" "}
+              <Link href={`/invoices?${q}&view=late-today`} className="text-brand underline">{tm("invoices.view.late-today")}</Link>
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {canRecordPayment(user, b.id) ? <Link href={`/payment?${q}`} className={buttonClasses("primary")}>{tm("links.recordPayment")}</Link> : null}
+            {canUseCashBox(user, b.id) ? <Link href={`/cash-box?${q}`} className={buttonClasses("secondary")}>{tm("links.cashBox")}</Link> : null}
           </div>
         </Card>
       ) : null}

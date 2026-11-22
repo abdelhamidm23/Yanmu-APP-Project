@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { SectionPlaceholder } from "@/components/SectionPlaceholder";
 
 /** Actions that are built so far, and where they open. The rest arrive in later phases. */
-const READY: Partial<Record<AddAction, string>> = { child: "/children/new", "roll-call": "/roll-call" };
+const READY: Partial<Record<AddAction, string>> = { child: "/children/new", "roll-call": "/roll-call", payment: "/payment", expense: "/expenses/new" };
 
 /** "+ Add" sheet (spec §11.1), filtered by the active role. Each action is built in its own phase. */
 export default async function AddPage({

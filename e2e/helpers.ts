@@ -31,7 +31,7 @@ export async function signInWithNewMfa(page: Page, email: string, locale: "ar" |
   await page.locator("#code").fill(totp(secret));
   await page.getByTestId("mfa-confirm").click();
   await page.getByTestId("mfa-done").click();
-  await expect(page).toHaveURL(new RegExp(`/${locale}/home$`));
+  await expect(page).toHaveURL(new RegExp(`/${locale}/(home|money)$`));
   return secret;
 }
 

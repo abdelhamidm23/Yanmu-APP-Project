@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { requireSection } from "@/lib/require-user";
-import { canOpenSettings, isOrgAdmin, canOpenToday, canTakeAttendance, canViewChildren, canViewStaff, canViewStaffAttendance } from "@/lib/permissions";
+import { canOpenSettings, isOrgAdmin, canOpenToday, canViewMoney, canUseCashBox, canReconcileCash, canDecideMoney, canViewExpenses, canRequestCredit, canRecordExpense, canTakeAttendance, canViewChildren, canViewStaff, canViewStaffAttendance } from "@/lib/permissions";
 import { canOpenSection, requiresMfa } from "@/lib/roles";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -47,6 +47,28 @@ export default async function MorePage({
     { show: canViewStaff(user) && !hasTab("staff"), href: "/staff", title: t("staff.title"), text: t("more.staffLink"), id: "open-staff" },
     { show: canViewStaffAttendance(user) && !hasTab("staff-attendance"), href: "/staff-attendance", title: t("staffAttendance.title"), text: t("more.staffAttendanceLink"), id: "open-staff-attendance" },
   ].filter((l) => l.show);
+  // Money (Phase 4): the screens a role reaches beyond its own tabs.
+  const moneyLinks = [
+    { show: canViewMoney(user) && !hasTab("money"), href: "/money", title: t("money.title"), text: t("more.moneyLink"), id: "open-money" },
+    { show: canViewMoney(user) && !hasTab("invoices"), href: "/invoices", title: t("money.links.invoices"), text: t("more.invoicesLink"), id: "open-invoices" },
+    { show: canViewMoney(user), href: "/payments", title: t("money.links.payments"), text: t("more.paymentsLink"), id: "open-payments" },
+    {
+      show: (canUseCashBox(user) || canReconcileCash(user) || canDecideMoney(user)) && !hasTab("cash-box"),
+      href: "/cash-box",
+      title: t("money.links.cashBox"),
+      text: t("more.cashBoxLink"),
+      id: "open-cash-box",
+    },
+    { show: canViewExpenses(user), href: "/expenses", title: t("money.links.expenses"), text: t("more.expensesLink"), id: "open-expenses" },
+    {
+      show: (canDecideMoney(user) || canRequestCredit(user) || canRecordExpense(user)) && !hasTab("inbox"),
+      href: "/inbox",
+      title: t("money.links.approvals"),
+      text: t("more.approvalsLink"),
+      id: "open-inbox",
+    },
+    { show: canViewMoney(user) && !isOrgAdmin(user), href: "/settings/price-locks", title: t("money.links.priceLocks"), text: t("more.priceLocksLink"), id: "open-price-locks" },
+  ].filter((l) => l.show);
 
   return (
     <div className="flex flex-col gap-4">
@@ -57,6 +79,18 @@ export default async function MorePage({
         <section className="flex flex-col gap-2" data-testid="more-group-daily">
           <h2 className="text-section-title font-semibold">{t("more.groups.daily")}</h2>
           {dailyLinks.map((l) => (
+            <Link key={l.id} href={l.href} data-testid={l.id} className="flex min-h-11 flex-col gap-1 rounded-card border border-border bg-surface p-4 hover:bg-bg">
+              <span className="text-row-title font-semibold">{l.title}</span>
+              <span className="text-[14px] text-muted">{l.text}</span>
+            </Link>
+          ))}
+        </section>
+      ) : null}
+
+      {moneyLinks.length > 0 ? (
+        <section className="flex flex-col gap-2" data-testid="more-group-money">
+          <h2 className="text-section-title font-semibold">{t("more.groups.money")}</h2>
+          {moneyLinks.map((l) => (
             <Link key={l.id} href={l.href} data-testid={l.id} className="flex min-h-11 flex-col gap-1 rounded-card border border-border bg-surface p-4 hover:bg-bg">
               <span className="text-row-title font-semibold">{l.title}</span>
               <span className="text-[14px] text-muted">{l.text}</span>

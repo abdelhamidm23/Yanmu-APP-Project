@@ -112,3 +112,53 @@ export function canEditRoster(user: U, branchId: string): boolean {
 export function canViewStaffAttendance(user: U): boolean {
   return hasAnyRole(user, ["owner", "company_manager", "branch_manager", "hr"]);
 }
+
+/**
+ * Money (spec §5, Phase 4). The database enforces the same rules (drizzle/0009_phase4_money_rls.sql).
+ *   view: owner, company manager, branch manager, accountant, front desk
+ *   payments: front desk, branch manager, accountant · invoice run: accountant
+ *   credit notes: accountant creates, branch manager requests · decisions: owner, company manager
+ *   expenses: owner, company manager, branch manager, accountant view; branch manager and accountant record
+ *   cash box: front desk and branch manager; accountant reconciles
+ */
+export const FINANCE_VIEW_ROLES = ["owner", "company_manager", "branch_manager", "accountant", "front_desk"] as const;
+export const PAYMENT_ROLES = ["front_desk", "branch_manager", "accountant"] as const;
+export const EXPENSE_VIEW_ROLES = ["owner", "company_manager", "branch_manager", "accountant"] as const;
+export const EXPENSE_ROLES = ["branch_manager", "accountant"] as const;
+export const CASH_ROLES = ["front_desk", "branch_manager"] as const;
+export const DECIDER_ROLES = ["owner", "company_manager"] as const;
+export const CREDIT_ROLES = ["accountant", "branch_manager"] as const;
+export const VOID_ROLES = ["branch_manager", "accountant", "company_manager"] as const;
+
+const roleCheck = (roles: readonly RoleName[]) => (user: U, branchId?: string) =>
+  branchId ? hasRoleIn(user, roles, branchId) : hasAnyRole(user, roles);
+
+export const canViewMoney = roleCheck(FINANCE_VIEW_ROLES);
+export const canRecordPayment = roleCheck(PAYMENT_ROLES);
+export const canRunInvoices = roleCheck(["accountant"]);
+export const canRequestCredit = roleCheck(CREDIT_ROLES);
+export const canDecideMoney = roleCheck(DECIDER_ROLES);
+export const canViewExpenses = roleCheck(EXPENSE_VIEW_ROLES);
+export const canRecordExpense = roleCheck(EXPENSE_ROLES);
+export const canUseCashBox = roleCheck(CASH_ROLES);
+export const canReconcileCash = roleCheck(["accountant"]);
+export const canVoidPayment = roleCheck(VOID_ROLES);
+/** Fee lists, discounts, legacy prices and routine expense lists (settings, spec §11.8). */
+export const canEditFees = roleCheck(DECIDER_ROLES);
+
+/**
+ * Whether a money approval waits for this person now (spec §8.6): never their own request; the owner
+ * decides anything; the company manager decides up to the limit and recommends above it.
+ */
+export function myTurnToDecide(
+  user: U & { id: string },
+  r: { branchId: string; status: string; requestedBy: string | null; stepCount: number; currentStep: number },
+): "decide" | "recommend" | null {
+  if (r.status !== "pending" || r.requestedBy === user.id) return null;
+  if (hasRoleIn(user, ["owner"], r.branchId)) return "decide";
+  if (hasRoleIn(user, ["company_manager"], r.branchId)) {
+    if (r.stepCount === 1) return "decide";
+    if (r.currentStep === 1) return "recommend";
+  }
+  return null;
+}

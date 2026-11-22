@@ -24,7 +24,8 @@
     "db:setup": "pnpm db:migrate && pnpm seed:base",
     "test:db": "vitest run --project db",
     "seed:demo": "tsx scripts/seed-demo.ts",
-    "seed:wipe-demo": "tsx scripts/wipe-demo.ts"
+    "seed:wipe-demo": "tsx scripts/wipe-demo.ts",
+    "jobs": "tsx scripts/jobs.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "^5.3.0",

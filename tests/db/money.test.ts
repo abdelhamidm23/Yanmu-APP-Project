@@ -480,3 +480,42 @@ describe("late fees (spec §8.4.4, D5)", () => {
     });
   });
 });
+
+describe("demo documents and receipt photos", () => {
+  it("demo payments take their own DEMO- numbers and leave the real sequence alone", async () => {
+    await as(users.front_deskA, async (tx) => {
+      const [f] = await owner`insert into family (branch_id, account_no, display_name, is_demo) values (${branchA}, ${`${run}-demo`}, 'Demo', true) returning id`;
+      const [real1] = await tx`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'card', 100) returning receipt_no, is_demo`;
+      const [demo] = await tx`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${f.id}, 'card', 100) returning receipt_no, is_demo`;
+      const [real2] = await tx`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'card', 100) returning receipt_no, is_demo`;
+      expect(demo.is_demo).toBe(true);
+      expect(demo.receipt_no).toMatch(new RegExp(`^DEMO-${code}A-R\\d{4}-\\d{5}$`));
+      expect(real1.is_demo).toBe(false);
+      expect(Number(real2.receipt_no.slice(-5))).toBe(Number(real1.receipt_no.slice(-5)) + 1);
+    });
+  });
+
+  it("the person who uploads a receipt photo can read it; another branch cannot", async () => {
+    const id = await commitAs(users.branch_managerA, async (tx) => {
+      const [a] = await tx`insert into attachment (branch_id, file_name, mime_type, size_bytes, data) values (${branchA}, 'r.jpg', 'image/jpeg', 3, '\\x010203') returning id`;
+      return a.id as string;
+    });
+    await as(users.branch_managerA, async (tx) => {
+      expect(await tx`select id from attachment where id = ${id}`).toHaveLength(1);
+    });
+    const other = await makeUser("bm-B-photo", [["branch_manager", branchB]]);
+    await as(other, async (tx) => {
+      expect(await tx`select id from attachment where id = ${id}`).toHaveLength(0);
+      await expectError(tx, (sp) => sp`insert into attachment (branch_id, file_name, mime_type, size_bytes, data) values (${branchA}, 'x.jpg', 'image/jpeg', 1, '\\x01')`, denied);
+    });
+    // The accountant reads it once an expense uses it.
+    await as(users.accountantA, async (tx) => {
+      expect(await tx`select id from attachment where id = ${id}`).toHaveLength(0);
+    });
+    await owner`insert into expense (branch_id, category_id, spent_on, amount_piastres, payment_method, description, receipt_attachment_id)
+                values (${branchA}, ${A.food}, ${today}, 1000, 'card', 'photo test', ${id})`;
+    await as(users.accountantA, async (tx) => {
+      expect(await tx`select id from attachment where id = ${id}`).toHaveLength(1);
+    });
+  });
+});

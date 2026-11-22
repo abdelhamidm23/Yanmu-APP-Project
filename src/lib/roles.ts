@@ -161,7 +161,7 @@ export function addActionsFor(role: Role): AddAction[] {
 export const SECTION_PHASE: Record<Section, number> = {
   home: 7,
   branches: 7,
-  inbox: 7,
+  inbox: 4,
   reports: 7,
   issues: 5,
   today: 3,

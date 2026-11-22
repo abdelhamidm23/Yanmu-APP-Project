@@ -73,17 +73,20 @@ LANGUAGE sql STABLE AS $$ SELECT (now() AT TIME ZONE 'Africa/Cairo')::date $$;
 --> statement-breakpoint
 
 -- Gap-free document numbers per branch, kind and year: A-R2026-00001 (receipt), A-I… (invoice), A-C… (credit note).
-CREATE OR REPLACE FUNCTION app_next_doc_no(p_branch uuid, p_kind text, p_year integer) RETURNS text
+-- Demo documents (spec §16) count on their own sequence and read DEMO-A-R2026-00001, so wiping the demo
+-- never leaves a gap in the real numbers.
+CREATE OR REPLACE FUNCTION app_next_doc_no(p_branch uuid, p_kind text, p_year integer, p_demo boolean DEFAULT false) RETURNS text
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_no integer;
   v_code text;
+  v_kind text := CASE WHEN p_demo THEN p_kind || '_demo' ELSE p_kind END;
 BEGIN
-  INSERT INTO doc_sequence (branch_id, kind, year, next_no) VALUES (p_branch, p_kind, p_year, 2)
+  INSERT INTO doc_sequence (branch_id, kind, year, next_no) VALUES (p_branch, v_kind, p_year, 2)
   ON CONFLICT (branch_id, kind, year) DO UPDATE SET next_no = doc_sequence.next_no + 1
   RETURNING next_no - 1 INTO v_no;
   SELECT code INTO v_code FROM branch WHERE id = p_branch;
-  RETURN format('%s-%s%s-%s', v_code, upper(left(p_kind, 1)), p_year, lpad(v_no::text, 5, '0'));
+  RETURN format('%s%s-%s%s-%s', CASE WHEN p_demo THEN 'DEMO-' ELSE '' END, v_code, upper(left(p_kind, 1)), p_year, lpad(v_no::text, 5, '0'));
 END
 $$;
 --> statement-breakpoint
@@ -154,7 +157,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_branch uuid;
 BEGIN
-  SELECT branch_id INTO v_branch FROM family WHERE id = NEW.family_id;
+  SELECT branch_id, NEW.is_demo OR is_demo INTO v_branch, NEW.is_demo FROM family WHERE id = NEW.family_id;
   IF v_branch IS DISTINCT FROM NEW.branch_id THEN
     RAISE EXCEPTION 'family belongs to another branch' USING ERRCODE = '23514';
   END IF;
@@ -164,7 +167,7 @@ BEGIN
   IF NEW.student_id IS NULL AND NEW.kind <> 'late_fee' THEN
     RAISE EXCEPTION 'child required' USING ERRCODE = '23514';
   END IF;
-  NEW.invoice_no := app_next_doc_no(NEW.branch_id, 'invoice', extract(year FROM NEW.issue_date)::integer);
+  NEW.invoice_no := app_next_doc_no(NEW.branch_id, 'invoice', extract(year FROM NEW.issue_date)::integer, NEW.is_demo);
   NEW.status := 'open';
   NEW.total_piastres := 0;
   NEW.paid_piastres := 0;
@@ -297,14 +300,14 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_branch uuid;
 BEGIN
-  SELECT branch_id INTO v_branch FROM family WHERE id = NEW.family_id;
+  SELECT branch_id, NEW.is_demo OR is_demo INTO v_branch, NEW.is_demo FROM family WHERE id = NEW.family_id;
   IF v_branch IS DISTINCT FROM NEW.branch_id THEN
     RAISE EXCEPTION 'family belongs to another branch' USING ERRCODE = '23514';
   END IF;
   NEW.voided_at := NULL;
   NEW.voided_by := NULL;
   NEW.void_reason := NULL;
-  NEW.receipt_no := app_next_doc_no(NEW.branch_id, 'receipt', extract(year FROM NEW.received_at AT TIME ZONE 'Africa/Cairo')::integer);
+  NEW.receipt_no := app_next_doc_no(NEW.branch_id, 'receipt', extract(year FROM NEW.received_at AT TIME ZONE 'Africa/Cairo')::integer, NEW.is_demo);
   IF NEW.method = 'cash' THEN
     NEW.cash_session_id := app_open_cash_session(NEW.branch_id, (NEW.received_at AT TIME ZONE 'Africa/Cairo')::date);
     IF NEW.cash_session_id IS NULL AND NOT app_is_system() THEN
@@ -477,7 +480,8 @@ BEGIN
     SELECT * INTO v_cn FROM credit_note WHERE id = v_r.credit_note_id FOR UPDATE;
     IF v_final = 'approved' THEN
       UPDATE credit_note SET status = 'approved',
-        credit_no = app_next_doc_no(branch_id, 'credit', extract(year FROM app_cairo_today())::integer)
+        credit_no = app_next_doc_no(branch_id, 'credit', extract(year FROM app_cairo_today())::integer,
+                                    coalesce((SELECT is_demo FROM invoice WHERE id = v_cn.invoice_id), false))
       WHERE id = v_cn.id;
     ELSE
       UPDATE credit_note SET status = 'rejected' WHERE id = v_cn.id;
@@ -504,6 +508,7 @@ BEGIN
   SELECT * INTO v_i FROM invoice WHERE id = NEW.invoice_id FOR UPDATE;
   IF v_i.id IS NULL THEN RAISE EXCEPTION 'parent not found' USING ERRCODE = '23503'; END IF;
   NEW.branch_id := v_i.branch_id;
+  NEW.is_demo := NEW.is_demo OR v_i.is_demo;
   NEW.status := 'pending_approval';
   NEW.credit_no := NULL;
   NEW.approval_request_id := NULL;
@@ -970,5 +975,24 @@ CREATE POLICY audit_event_read_finance ON audit_event FOR SELECT TO yanmu_app
     table_name IN ('fee_list', 'fee_list_item', 'price_lock', 'discount_rule', 'student_service', 'invoice', 'invoice_line',
                    'cash_session', 'payment', 'payment_allocation', 'credit_note', 'expense_category',
                    'branch_routine_category', 'vendor', 'expense', 'approval_step')
-    AND app_has_role_in(branch_id, ARRAY['accountant']::app_role[])
+    AND (branch_id IN (SELECT r.branch_id FROM app_active_roles() r WHERE r.role = 'accountant')
+         OR (SELECT EXISTS (SELECT 1 FROM app_active_roles() r WHERE r.role = 'accountant' AND r.branch_id IS NULL)))
   );
+--> statement-breakpoint
+-- The audit log grows by every money change (about 1,000 rows a day per branch). Wrapping the role
+-- check in a sub-select makes PostgreSQL work it out once per query instead of once per row.
+DROP POLICY audit_event_read ON audit_event;
+--> statement-breakpoint
+CREATE POLICY audit_event_read ON audit_event FOR SELECT TO yanmu_app USING ((SELECT app_is_org_admin()));
+--> statement-breakpoint
+
+-- Receipt photos of expenses (spec §8.6) are attachments too. Expense writers may upload them and read
+-- what they uploaded; expense viewers read the receipts of expenses they can see. Children's photos
+-- and forms stay with the Phase 2 policy.
+CREATE POLICY attachment_read_expense ON attachment FOR SELECT TO yanmu_app
+  USING (
+    (app_expense_writer(branch_id) AND created_by = app_current_user_id())
+    OR (app_expense_viewer(branch_id) AND EXISTS (SELECT 1 FROM expense e WHERE e.receipt_attachment_id = attachment.id))
+  );
+--> statement-breakpoint
+CREATE POLICY attachment_insert_expense ON attachment FOR INSERT TO yanmu_app WITH CHECK (app_expense_writer(branch_id));
