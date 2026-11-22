@@ -65,8 +65,9 @@ const PLAN: Record<"A" | "B", [string, string, string, number, number][]> = {
   A: [
     ["babies", "Babies 1", "الرضع ١", 9, 9],
     ["toddlers", "Toddlers 1", "الدارجون ١", 12, 11],
-    ["toddlers", "Toddlers 2", "الدارجون ٢", 12, 11],
     ["juniors", "Juniors 1", "البراعم ١", 22, 20],
+    // Owner, 2026-11-22: Yanmu's second toddler class became "Juniors 2".
+    ["juniors", "Juniors 2", "البراعم ٢", 12, 11],
     ["seniors", "Seniors 1", "الكبار ١", 22, 21],
     ["seniors", "Seniors 2", "الكبار ٢", 22, 20],
   ],

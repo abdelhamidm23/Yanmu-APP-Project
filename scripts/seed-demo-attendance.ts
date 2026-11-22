@@ -17,7 +17,7 @@ type Db = PostgresJsDatabase<typeof schema>;
 
 // [class English name, carers in the class, carers absent today]
 const CARERS: Record<"A" | "B", [string, number, number][]> = {
-  A: [["Babies 1", 4, 1], ["Toddlers 1", 3, 0], ["Toddlers 2", 3, 0], ["Juniors 1", 4, 0], ["Seniors 1", 5, 1], ["Seniors 2", 4, 0]],
+  A: [["Babies 1", 4, 1], ["Toddlers 1", 3, 0], ["Juniors 1", 4, 0], ["Juniors 2", 3, 0], ["Seniors 1", 5, 1], ["Seniors 2", 4, 0]],
   B: [["Babies 1", 2, 0], ["Toddlers 1", 3, 1], ["Toddlers 2", 1, 0], ["Juniors 1", 2, 0], ["Juniors 2", 2, 0], ["Seniors 1", 1, 0], ["Seniors 2", 1, 0], ["Seniors 3", 1, 0]],
 };
 // Other staff: [Arabic job title, absent today]
@@ -27,7 +27,7 @@ const OTHERS: Record<"A" | "B", [string, boolean][]> = {
 };
 // Children today per class: [present, absent, excused]; classes not listed have no roll call yet.
 const CHILDREN: Record<"A" | "B", Record<string, [number, number, number]>> = {
-  A: { "Babies 1": [8, 1, 0], "Toddlers 1": [10, 0, 1], "Toddlers 2": [10, 1, 0], "Juniors 1": [18, 1, 1], "Seniors 1": [18, 2, 1], "Seniors 2": [18, 2, 0] },
+  A: { "Babies 1": [8, 1, 0], "Toddlers 1": [10, 0, 1], "Juniors 1": [18, 1, 1], "Juniors 2": [10, 1, 0], "Seniors 1": [18, 2, 1], "Seniors 2": [18, 2, 0] },
   B: { "Babies 1": [5, 1, 0], "Toddlers 1": [12, 0, 0], "Toddlers 2": [4, 1, 0], "Juniors 1": [8, 1, 0], "Juniors 2": [8, 1, 0], "Seniors 2": [6, 1, 0] },
 };
 const EXCUSES = ["مريض", "موعد طبيب", "سفر مع الأسرة"];
