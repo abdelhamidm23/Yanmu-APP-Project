@@ -170,7 +170,7 @@ export async function openMoneyRequests(tx: Tx): Promise<InboxItem[]> {
     left join credit_note cn on cn.id = r.credit_note_id
     left join invoice i on i.id = cn.invoice_id
     left join family f on f.id = i.family_id
-    where r.type in ('expense', 'credit_note', 'refund', 'late_fee_waiver') and r.status in ('pending', 'question')
+    where r.type in ('expense', 'credit_note', 'refund', 'late_fee_waiver') and r.status in ('pending', 'question') and b.is_active
     order by r.created_at`)) as unknown as InboxItem[];
 }
 

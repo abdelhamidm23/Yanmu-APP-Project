@@ -21,6 +21,11 @@ import { reopenRequests } from "@/db/closing";
 import { isOwner } from "@/lib/permissions";
 import { monthLabel } from "@/components/money/Money";
 import { ClosingResult } from "@/components/closing/Closing";
+import { AttentionList } from "@/components/home/Home";
+import { homeScope } from "@/db/home-view";
+import { attentionItems } from "@/db/home";
+import { rankAttention } from "@/lib/home";
+import { todayInCairo } from "@/lib/calendar";
 
 /**
  * Inbox (spec §8.6, §9.4, §10, §11.1): this person's alerts (critical ones first, with "I'm on it"),
@@ -31,7 +36,7 @@ export default async function InboxPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ ok?: string; done?: string; error?: string }>;
+  searchParams: Promise<{ ok?: string; done?: string; error?: string; show?: string }>;
 }) {
   const { locale } = await params;
   const sp = await searchParams;
@@ -46,9 +51,19 @@ export default async function InboxPage({
   const safetyViewer = canViewSafety(user);
 
   const owner = isOwner(user);
-  const { items, alerts, waiting, overdue, reopens } = await withUserDb(user.id, async (tx) => {
+  // Filters (spec §11.5): "Needs me" (default) or "All".
+  const showAll = sp.show === "all";
+  const home = user.activeRole === "owner" || user.activeRole === "company_manager";
+  const { items, alerts: allAlerts, waiting, overdue, reopens, attention, branches } = await withUserDb(user.id, async (tx) => {
     const open = money ? await openMoneyRequests(tx) : [];
+    const scope = home ? await homeScope(tx, user, "all", { ar: "", en: "" }) : null;
     return {
+      // Everything that "Requires your attention" (spec §9.6); Home shows the first four.
+      // Money approvals and months to reopen have their own sections below, with the buttons to decide.
+      attention: scope
+        ? rankAttention(await attentionItems(tx, user, scope.parts, todayInCairo())).filter((a) => a.kind !== "approval" && a.kind !== "reopen")
+        : [],
+      branches: scope?.branches ?? [],
       items: await Promise.all(open.map(async (r) => ({ r, trail: (await approvalTrail(tx, r.id))!, turn: myTurnToDecide(user, r) }))),
       alerts: await myAlerts(tx, user.id),
       waiting: await incidentsWaitingFor(tx, user),
@@ -66,6 +81,7 @@ export default async function InboxPage({
     : a.subjectTable === "daily_close" || a.key.startsWith("daily_close") ? `/daily-close?branch=${a.branchId}`
     : a.subjectTable === "cash_session" ? `/cash-box?branch=${a.branchId}`
     : `/today?branch=${a.branchId}`;
+  const alerts = showAll ? allAlerts : allAlerts.filter((a) => !a.resolvedAt);
   const unread = alerts.filter((a) => !a.readAt).length;
   const mineToDecide = items.filter((x) => x.turn);
   const myRequests = items.filter((x) => x.r.requestedBy === user.id);
@@ -128,6 +144,20 @@ export default async function InboxPage({
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title={ta("inboxTitle")} />
+      <nav aria-label={ta("filter")} className="flex gap-2" data-testid="inbox-filter">
+        {(["mine", "all"] as const).map((f) => (
+          <Link
+            key={f}
+            href={f === "all" ? "/inbox?show=all" : "/inbox"}
+            aria-current={(f === "all") === showAll ? "page" : undefined}
+            className={`inline-flex min-h-11 items-center rounded-button px-4 text-[14px] font-medium ${
+              (f === "all") === showAll ? "bg-brand text-white" : "border border-outline bg-surface text-ink hover:bg-bg"
+            }`}
+          >
+            {ta(f === "all" ? "filterAll" : "filterMine")}
+          </Link>
+        ))}
+      </nav>
       {sp.done === "acknowledged" ? (
         <SafetyResult searchParams={sp} />
       ) : sp.done === "reopened" || sp.done === "keptClosed" ? (
@@ -135,6 +165,8 @@ export default async function InboxPage({
       ) : (
         <MoneyResult searchParams={sp} />
       )}
+
+      {home ? <AttentionList items={attention} branches={branches} locale={loc} digits={user.digits} total={attention.length} /> : null}
 
       {reopens.length ? (
         <section className="flex flex-col gap-3" aria-labelledby="inbox-reopen" data-testid="inbox-reopen">
@@ -261,7 +293,7 @@ export default async function InboxPage({
         </section>
       ) : null}
 
-      {others.length ? (
+      {showAll && others.length ? (
         <section className="flex flex-col gap-3" aria-labelledby="inbox-others">
           <h2 id="inbox-others" className="text-section-title font-semibold">{t("others")}</h2>
           <p className="text-meta text-muted">{t("othersHelp")}</p>

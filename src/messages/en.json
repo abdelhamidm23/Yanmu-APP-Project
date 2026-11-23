@@ -407,7 +407,9 @@
         },
         "attention": {
           "overdue_days": "Flag families overdue for more than (days)",
-          "overdue_amount_piastres": "Flag families owing more than"
+          "overdue_amount_piastres": "Flag families owing more than",
+          "expense_rise_percent": "Flag an expense category this much above its 3-month average (%)",
+          "occupancy_drop_points": "Flag occupancy down this many points in a month"
         },
         "attendance": {
           "opening_time": "Opening time",
@@ -2005,7 +2007,10 @@
       "denied": "Alerts are blocked in this browser's settings. Allow notifications for this site, then try again.",
       "notSetUp": "Push alerts are not set up on the server yet. Alerts still show inside the app.",
       "failed": "Could not turn on alerts. Please try again."
-    }
+    },
+    "filter": "Show",
+    "filterMine": "Needs me",
+    "filterAll": "All"
   },
   "closing": {
     "noBranch": "You are not assigned to a branch yet.",
@@ -2261,6 +2266,305 @@
         "attendance_day": "No class has taken attendance yet.",
         "staff_present": "No fingerprint file uploaded for this day."
       }
+    }
+  },
+  "home": {
+    "greeting": {
+      "morning": "Good morning, {name}",
+      "afternoon": "Good afternoon, {name}",
+      "evening": "Good evening, {name}"
+    },
+    "updated": "Updated {time}",
+    "daysClosed": "Days closed in {month}: {list}",
+    "daysClosedItem": "{branch} {done} of {total}",
+    "branch": "Branch",
+    "briefingTitle": "Today at a glance",
+    "briefingFoot": "Written from today's records only. Nothing is estimated.",
+    "brief": {
+      "notWorking": "Today is not a working day.",
+      "attendanceNone": "No class has taken today's attendance yet ({classes} classes).",
+      "attendanceNoneExpected": "Attendance was taken, but no children were expected today.",
+      "attendanceAll": "Attendance is {pct}% ({present} of {expected} expected); every class has taken today's attendance.",
+      "attendanceMissing": "Attendance is {pct}% ({present} of {expected} expected); {missing} {count, plural, one {has} other {have}} not taken today's attendance.",
+      "incidentsToday": "{count, plural, one {{n} incident} other {{n} incidents}} logged today.",
+      "incidentsNoneConfirmed": "No incidents today (confirmed).",
+      "incidentsNoneYet": "No incidents logged today, not confirmed until the {time} close.",
+      "critical": "{count, plural, one {{n} critical incident is} other {{n} critical incidents are}} open; waiting for your review.",
+      "money": "EGP {collected} collected this month; {families, plural, =0 {no family is overdue} one {{n} family is overdue} other {{n} families are overdue}}.",
+      "staffNotUploaded": "Staff attendance not uploaded yet.",
+      "staffAbsent": "{count, plural, one {{n} staff member} other {{n} staff}} absent.",
+      "staffAllIn": "All staff are in.",
+      "ratio": "{count, plural, one {{n} class} other {{n} classes}} fell below the staff ratio today.",
+      "notClosed": "{branch} has not closed {date}."
+    },
+    "attentionTitle": "Requires your attention",
+    "attentionNone": "Nothing needs you right now.",
+    "attentionMore": "See {n} more in Inbox",
+    "attentionMeta": "{branch} · {when}",
+    "kinds": {
+      "critical_incident": {
+        "chip": "Critical",
+        "title": "Critical incident open: {category}",
+        "action": "Open"
+      },
+      "approval": {
+        "chip": "Approval",
+        "title": "{type} waiting for your decision",
+        "detail": "EGP {amount}",
+        "action": "Decide"
+      },
+      "reopen": {
+        "chip": "Month close",
+        "title": "Reopen {month}?",
+        "detail": "The accountant asked to reopen a closed month.",
+        "action": "Decide"
+      },
+      "over_capacity": {
+        "chip": "Over capacity",
+        "title": "A child over the licence cap needs your decision",
+        "action": "Decide"
+      },
+      "overdue_family": {
+        "chip": "Overdue",
+        "title": "Account {account} · {family}",
+        "detail": "Owes EGP {amount} on {invoices, plural, one {{nInvoices} bill} other {{nInvoices} bills}}; the oldest is {days} days late.",
+        "action": "See bills"
+      },
+      "ratio_breach": {
+        "chip": "Ratio",
+        "title": "{count, plural, one {{n} class} other {{n} classes}} below the staff ratio today",
+        "detail": "Classes: {classes}",
+        "action": "See"
+      },
+      "close_missing": {
+        "chip": "Daily close",
+        "title": "{date} is not closed",
+        "action": "Open"
+      },
+      "expense_rise": {
+        "chip": "Expenses",
+        "title": "{category} spending is high this month",
+        "detail": "EGP {amount} so far; the 3-month average is EGP {average}.",
+        "action": "See expenses"
+      },
+      "occupancy_drop": {
+        "chip": "Occupancy",
+        "title": "Children went down from {before} to {now} in a month",
+        "detail": "Licensed for {licensed}.",
+        "action": "See children"
+      },
+      "cash_variance": {
+        "chip": "Cash box",
+        "title": "Cash box difference on {date}",
+        "detail": "EGP {amount}, not checked yet.",
+        "action": "See"
+      }
+    },
+    "groups": {
+      "money": "Money",
+      "children": "Children",
+      "team": "Team",
+      "safety": "Safety and operations"
+    },
+    "tiles": {
+      "money_billed": "Revenue billed",
+      "money_collected": "Collected this month",
+      "money_collection_rate": "Collection rate",
+      "money_overdue": "Overdue tuition",
+      "money_result": "Operating result, {month}",
+      "children_active": "Active children",
+      "children_occupancy": "Occupancy",
+      "attendance_day": "Attendance today",
+      "waitlist": "Waitlist",
+      "staff_present": "Staff present",
+      "ratio_breaches": "Ratio breaches today",
+      "incidents_open_critical": "Open critical incidents",
+      "incidents_month": "Incidents this month",
+      "approvals": "Approvals waiting",
+      "actions_overdue": "Overdue actions"
+    },
+    "ctx": {
+      "month": "{month}, so far",
+      "collectionRate": "Of tuition due so far this month",
+      "families": "{count, plural, one {{n} family} other {{n} families}}",
+      "resultLine": "{billed} billed − {costs} costs",
+      "noClosedMonth": "No month closed yet. The accountant closes each month by the 7th.",
+      "resultTitleNone": "Operating result",
+      "licensed": "Licensed for {n}",
+      "ofLicensed": "Of {n} licensed places",
+      "attendance": "{present} of {expected} · {done} of {total} classes",
+      "nobodyWaiting": "Nobody waiting",
+      "ofStaff": "Of {n} staff",
+      "classesChecked": "{done} of {total} classes checked",
+      "perHundred": "{rate} per 100 children",
+      "forYou": "For your decision",
+      "pastDue": "Incident actions and issues past their due date"
+    },
+    "tap": "Details",
+    "detail": {
+      "back": "Back to Home",
+      "asOf": "As of {date}",
+      "byBranch": "By branch",
+      "perChild": "Per active child",
+      "highest": "Highest",
+      "trend12": "Last 12 months",
+      "trend14": "Last 14 days",
+      "beforeRecords": "No records yet",
+      "records": "Records behind this figure",
+      "formulaTitle": "How it is worked out",
+      "export": "Export to Excel",
+      "ageing": "How late",
+      "longest": "Longest overdue",
+      "familiesN": "{count, plural, one {{n} family} other {{n} families}}",
+      "cols": {
+        "account": "Account",
+        "family": "Family",
+        "branch": "Branch",
+        "invoices": "Bills",
+        "amount": "Amount",
+        "days": "Days late",
+        "value": "Figure",
+        "status": "Status",
+        "class": "Class",
+        "present": "Present",
+        "expected": "Expected",
+        "marked": "Marked",
+        "children": "Children",
+        "carers": "Carers",
+        "required": "Needed",
+        "time": "Time",
+        "due": "Due",
+        "owner": "Who"
+      },
+      "askCall": "Ask branches to call these families",
+      "askCallHelp": "Each branch manager gets a follow-up issue with the account numbers to call. They do not see the amounts.",
+      "classesToday": "Classes today",
+      "breachesToday": "Below the staff ratio today",
+      "noBreaches": "No class fell below the ratio today.",
+      "overdueList": "Past their due date",
+      "nothingOverdue": "Nothing is past its due date.",
+      "openRecords": "Open",
+      "links": {
+        "invoices": "Invoices",
+        "overdueInvoices": "Overdue families",
+        "payments": "Payments",
+        "children": "Children",
+        "waitlist": "Waitlist",
+        "incidents": "Incidents",
+        "critical": "Critical incidents",
+        "issues": "Overdue issues",
+        "monthClose": "Month close",
+        "staffAttendance": "Staff attendance",
+        "figures": "All figures"
+      },
+      "formula": {
+        "money_billed": "Tuition and services invoiced for this month, minus credit notes against them. Late fees are not included.",
+        "money_collected": "All payments received from the 1st of the month to today, minus voided payments.",
+        "money_collection_rate": "Tuition paid on this month's bills that are already due, divided by the tuition of those bills.",
+        "money_overdue": "What is still unpaid on tuition and service bills past their due date. Late fees are counted apart.",
+        "money_result": "Revenue billed minus all costs: expenses recorded in the app plus the costs paid centrally from the accountant's month-close sheet (salaries, rent and so on). Verified once the month is closed.",
+        "children_active": "Children with a place on the day: enrolled and started, not yet left.",
+        "children_occupancy": "Active children divided by the licensed places of the branch.",
+        "attendance_day": "Children present divided by children present or absent. Children not marked yet are not counted as absent.",
+        "staff_present": "Staff present or late in the fingerprint file, out of the active staff of the branch.",
+        "ratio_breaches": "Classes where the carers present were fewer than the children present divided by the age group's children per carer.",
+        "incidents_open_critical": "Critical incidents not closed yet.",
+        "incidents_month": "Incidents that happened from the 1st of the month to today. The rate is per 100 active children.",
+        "actions_overdue": "Incident actions and issues not done by their due date."
+      },
+      "unknown": "This figure has no detail page.",
+      "askCallLimits": "Families more than {days} days late or owing more than EGP {amount} are included."
+    },
+    "compare": {
+      "title": "Compare branches",
+      "help": "Figures per active child, so branches of different sizes compare fairly. The better branch is marked.",
+      "month": "Month",
+      "show": "Show",
+      "metric": "Figure",
+      "better": "Better",
+      "trend": "Last 6 months",
+      "closedMonth": "Verified: the month is closed.",
+      "openMonth": "Provisional: the month is not closed yet. Costs and the result need the month-close upload.",
+      "needsUpload": "Needs the month-close upload",
+      "metrics": {
+        "revenuePerChild": {
+          "label": "Revenue per active child",
+          "help": "Billed ÷ active children"
+        },
+        "costPerChild": {
+          "label": "Operating cost per active child",
+          "help": "All costs ÷ active children"
+        },
+        "resultPerChild": {
+          "label": "Result per active child",
+          "help": "Billed − costs, ÷ active children"
+        },
+        "staffCostRatio": {
+          "label": "Staff cost ratio",
+          "help": "Salaries ÷ revenue, closed months only"
+        },
+        "collectionRate": {
+          "label": "Collection rate",
+          "help": "Tuition paid ÷ tuition due"
+        },
+        "occupancy": {
+          "label": "Occupancy",
+          "help": "Active children ÷ licensed places"
+        },
+        "incidentRate": {
+          "label": "Incident rate",
+          "help": "Incidents per 100 active children"
+        },
+        "overduePerChild": {
+          "label": "Overdue tuition per active child",
+          "help": "Overdue ÷ active children"
+        },
+        "breakEven": {
+          "label": "Break-even occupancy",
+          "help": "Fixed costs ÷ ((average fee − variable cost per child) × licensed places)"
+        }
+      }
+    },
+    "reports": {
+      "title": "Reports",
+      "help": "Download a report for any month, or open a figure to see how it is worked out.",
+      "monthly": "Monthly report",
+      "monthlyHelp": "Every figure of each branch for the month with its status, the branch comparison and what needs your attention. Excel.",
+      "month": "Month",
+      "download": "Download Excel",
+      "lists": "Lists to export",
+      "screens": "Screens",
+      "links": {
+        "figures": "All figures with their status",
+        "compare": "Compare branches",
+        "monthClose": "Month close and the accountant's pack",
+        "overdue": "Overdue families (Excel)",
+        "incidents": "Incidents (Excel)",
+        "issues": "Issues (Excel)",
+        "payStatus": "Who paid (Excel)"
+      },
+      "sheets": {
+        "summary": "Figures",
+        "compare": "Comparison",
+        "attention": "Attention"
+      },
+      "cols": {
+        "branch": "Branch",
+        "figure": "Figure",
+        "value": "Value",
+        "status": "Status",
+        "coverage": "Coverage",
+        "kind": "Type",
+        "item": "What",
+        "since": "Since"
+      }
+    },
+    "asked": "Done. {count, plural, one {The branch has} other {{n} branches have}} a follow-up issue to call these families.",
+    "errors": {
+      "none_to_call": "No family is over the limits for a call, so nothing was sent.",
+      "forbidden": "You are not allowed to do that.",
+      "invalid": "Something in the form is not right.",
+      "unknown": "Something went wrong. Please try again."
     }
   }
 }
