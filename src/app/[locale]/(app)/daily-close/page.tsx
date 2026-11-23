@@ -103,6 +103,7 @@ export default async function DailyClosePage({
                     <Flag tone={st?.state === "fix" ? "attention" : "good"}>{t(`answer.${st?.state ?? "correct"}`)}</Flag>
                   </div>
                   <p className="mt-1 text-[14px] text-subtle figure">{factLine(s, { ...facts, [s]: f } as DayFacts, t, n)}</p>
+                  <p className="mt-1 text-[14px]">{question(s, { ...facts, [s]: f } as DayFacts, t)}</p>
                   {st?.note ? <p className="mt-2 text-[14px]">{st.note}</p> : null}
                 </Card>
               </li>
@@ -123,19 +124,22 @@ export default async function DailyClosePage({
           <input type="hidden" name="branchId" value={b.id} />
           <input type="hidden" name="date" value={date} />
           {DAILY_CLOSE_SECTIONS.map((s) => {
-            const empty = emptySection(s, facts);
             return (
               <Card key={s} data-testid={`section-${s}`}>
-                <fieldset className="flex flex-col gap-2">
+                <fieldset className="group flex flex-col gap-2">
                   <legend className="font-semibold">{t(`sections.${s}`)}</legend>
-                  <p className="text-[14px] text-subtle figure">{empty ? t(`empty.${s}`) : factLine(s, facts, t, n)}</p>
+                  <p className="text-[14px] text-subtle figure">{factLine(s, facts, t, n)}</p>
+                  <p className="text-[16px] font-medium">{question(s, facts, t)}</p>
                   <div className="flex flex-wrap gap-2">
-                    <Choice name={`s-${s}`} value="ok" label={empty ? t("yesNone") : t("correct")} testId={`ok-${s}`} />
-                    <Choice name={`s-${s}`} value="fix" label={t("fix")} testId={`fix-${s}`} />
+                    <Choice name={`s-${s}`} value="yes" label={t("yes")} testId={`yes-${s}`} />
+                    <Choice name={`s-${s}`} value="no" label={t("no")} testId={`no-${s}`} />
                   </div>
-                  <label htmlFor={`n-${s}`} className="text-[13px] font-medium text-subtle">{t("fixNote")}</label>
-                  <input id={`n-${s}`} name={`n-${s}`} maxLength={500} className="min-h-11 w-full rounded-button border border-outline bg-surface px-3 text-[15px]" aria-describedby={`n-${s}-hint`} />
-                  <p id={`n-${s}-hint`} className="text-meta text-muted">{t("fixNoteHint")}</p>
+                  {/* Shown once "Yes" is chosen; the database refuses a "Yes" without details. */}
+                  <div className="hidden flex-col gap-1 group-has-[input[value=yes]:checked]:flex">
+                    <label htmlFor={`n-${s}`} className="text-[13px] font-medium text-subtle">{t("details")}</label>
+                    <textarea id={`n-${s}`} name={`n-${s}`} rows={2} maxLength={500} className="min-h-11 w-full rounded-button border border-outline bg-surface p-3 text-[15px]" aria-describedby={`n-${s}-hint`} />
+                    <p id={`n-${s}-hint`} className="text-meta text-muted">{t("detailsHint")}</p>
+                  </div>
                 </fieldset>
               </Card>
             );
@@ -152,7 +156,7 @@ export default async function DailyClosePage({
             <li key={s}>
               <Card>
                 <h3 className="font-semibold">{t(`sections.${s}`)}</h3>
-                <p className="mt-1 text-[14px] text-subtle figure">{emptySection(s, facts) ? t(`empty.${s}`) : factLine(s, facts, t, n)}</p>
+                <p className="mt-1 text-[14px] text-subtle figure">{factLine(s, facts, t, n)}</p>
               </Card>
             </li>
           ))}
@@ -190,6 +194,11 @@ function Choice({ name, value, label, testId }: { name: string; value: string; l
       {label}
     </label>
   );
+}
+
+/** The Yes/No question for a section: "Yes" always means something to report, with details. */
+function question(s: Section, f: DayFacts, t: T): string {
+  return emptySection(s, f) ? t(`questionEmpty.${s}`) : t(`question.${s}`);
 }
 
 type T = Awaited<ReturnType<typeof getTranslations<"closing.day">>>;

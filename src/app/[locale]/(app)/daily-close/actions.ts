@@ -34,9 +34,10 @@ export async function closeDay(fd: FormData) {
           for (const s of DAILY_CLOSE_SECTIONS) {
             const raw = String(fd.get(`s-${s}`) ?? "");
             const note = String(fd.get(`n-${s}`) ?? "").trim().slice(0, 500);
-            // "Yes, none" is only an answer for a section with nothing in it; otherwise it is "Correct".
+            // Each section is a Yes/No question where "Yes" means something to report (stored as "fix",
+            // details required). "No" is "none" for a section with nothing in it, otherwise "correct".
             const empty = emptySection(s, facts);
-            const state = raw === "fix" ? "fix" : raw === "ok" ? (empty ? "none" : "correct") : "";
+            const state = raw === "yes" ? "fix" : raw === "no" ? (empty ? "none" : "correct") : "";
             if (!state) return { error: "section_missing" };
             sections[s] = { state, ...(note ? { note } : {}), facts: facts[s] };
           }

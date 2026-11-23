@@ -2024,8 +2024,8 @@
       "unknown": "Something went wrong. Please try again.",
       "invalid": "Please check what you entered.",
       "forbidden": "You cannot do this.",
-      "section_missing": "Answer every section before closing the day.",
-      "fix_note_required": "For each section marked “To fix”, write what needs fixing.",
+      "section_missing": "Answer every question before closing the day.",
+      "fix_note_required": "For each question you answered “Yes”, write the details.",
       "already_closed": "This day is already closed.",
       "invalid_date": "Choose today or an earlier day.",
       "not_pending": "This was already done.",
@@ -2038,13 +2038,13 @@
     },
     "day": {
       "title": "Close the day",
-      "help": "Check the day once, section by section: one tap each. Please close it by {time}.",
+      "help": "Answer each question with Yes or No. If you answer Yes, write the details. Please close the day by {time}.",
       "dateLabel": "Day",
       "show": "Show",
       "late": "Closed late",
       "closedBy": "Closed by {name}, {when}.",
       "notWorking": "This is not a working day, so there is nothing to close.",
-      "notClosedYou": "Not closed yet. Check each section below, then close the day.",
+      "notClosedYou": "Not closed yet. Answer each question below, then close the day.",
       "notClosedView": "Not closed yet. The branch manager closes the day.",
       "todayOpen": "Today is not closed yet.",
       "view": "See the daily close",
@@ -2073,32 +2073,40 @@
         "incidents": "{count} incidents ({critical} critical), {open} still open.",
         "issues": "{new} new, {resolved} done, {open} open ({overdue} overdue)."
       },
-      "empty": {
-        "attendance": "No attendance was recorded for this day. Is that right?",
-        "pickups": "No pickups were recorded. Is that right?",
-        "staff": "No fingerprint file for this day. Is that right?",
-        "payments": "No payments today?",
-        "expenses": "No expenses today?",
-        "incidents": "No incidents today?",
-        "issues": "No new or finished issues today?"
-      },
-      "correct": "Correct",
-      "fix": "To fix",
-      "yesNone": "Yes, none",
       "answer": {
-        "correct": "Correct",
-        "fix": "To fix",
-        "none": "Confirmed none"
+        "correct": "No, all correct",
+        "fix": "Yes, see details",
+        "none": "No, none"
       },
-      "fixNote": "What needs fixing",
-      "fixNoteHint": "Needed when you choose “To fix”.",
       "notes": "Notes for management (optional)",
       "managerNotes": "Notes for management",
       "submit": "Close the day",
       "recent": "Recent working days",
       "closed": "Closed",
       "lateClosed": "Closed late",
-      "open": "Not closed"
+      "open": "Not closed",
+      "question": {
+        "attendance": "Is anything wrong or missing in today's children's attendance?",
+        "pickups": "Was there any problem with pickups today?",
+        "staff": "Was there any problem with staff attendance today?",
+        "payments": "Is any payment missing, or was there a problem with the cash box?",
+        "expenses": "Was any money spent today that is not recorded here?",
+        "incidents": "Did any other accident or incident happen today that is not recorded here?",
+        "issues": "Is there any problem in the branch that is not recorded as an issue?"
+      },
+      "questionEmpty": {
+        "attendance": "No attendance was taken today. Did any children attend?",
+        "pickups": "No pickups were recorded today. Was there any problem with pickups?",
+        "staff": "Was there any problem with staff attendance today?",
+        "payments": "Was any payment received today that is not recorded?",
+        "expenses": "Was any money spent today that is not recorded?",
+        "incidents": "Did any accident or incident happen today?",
+        "issues": "Is there any problem in the branch that is not recorded as an issue?"
+      },
+      "yes": "Yes",
+      "no": "No",
+      "details": "Please write the details",
+      "detailsHint": "What happened, and what needs doing."
     },
     "month": {
       "title": "Month close",

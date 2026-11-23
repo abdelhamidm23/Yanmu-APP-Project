@@ -26,7 +26,7 @@ async function undoMonth(branchId: string) {
   });
 }
 
-test("the branch manager closes a day, one tap per section", async ({ page }) => {
+test("the branch manager closes a day, one Yes/No question per section", async ({ page }) => {
   const [b] = await ownerQuery((sql) => sql`select id from branch where code = 'B'`);
   const [{ d }] = await ownerQuery(
     (sql) => sql`select to_char(max(d::date), 'YYYY-MM-DD') as d from generate_series(${today}::date - 10, ${today}::date - 1, interval '1 day') d
@@ -38,13 +38,15 @@ test("the branch manager closes a day, one tap per section", async ({ page }) =>
   await expect(page).toHaveURL(/\/en\/today/);
   await page.goto(`/en/daily-close?branch=${b.id}&date=${d}`);
   await expect(page.getByTestId("close-day-form")).toBeVisible();
-  for (const s of ["attendance", "pickups", "staff", "payments", "expenses", "incidents", "issues"]) await page.getByTestId(`ok-${s}`).check();
-  // "To fix" needs a word on what is wrong.
-  await page.getByTestId("fix-staff").check();
+  for (const s of ["attendance", "pickups", "staff", "payments", "expenses", "incidents", "issues"]) await page.getByTestId(`no-${s}`).check();
+  // "Yes" opens a details box and needs a word on what happened.
+  await expect(page.locator("#n-staff")).toBeHidden();
+  await page.getByTestId("yes-staff").check();
+  await expect(page.locator("#n-staff")).toBeVisible();
   await page.getByTestId("submit-close").click();
-  await expect(page.locator("main [role=alert]")).toContainText("write what needs fixing");
-  for (const s of ["attendance", "pickups", "payments", "expenses", "incidents", "issues"]) await page.getByTestId(`ok-${s}`).check();
-  await page.getByTestId("fix-staff").check();
+  await expect(page.locator("main [role=alert]")).toContainText("write the details");
+  for (const s of ["attendance", "pickups", "payments", "expenses", "incidents", "issues"]) await page.getByTestId(`no-${s}`).check();
+  await page.getByTestId("yes-staff").check();
   await page.locator("#n-staff").fill("Two morning punches missing");
   await page.getByTestId("submit-close").click();
   await expect(page.locator("main [role=status]")).toHaveText("The day is closed. Thank you.");
