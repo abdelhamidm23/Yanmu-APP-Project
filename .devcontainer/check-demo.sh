@@ -4,6 +4,7 @@
 cd "$(dirname "$0")/.."
 . .devcontainer/demo-env.sh
 echo "------------------------------------------------------------"
+echo "Branch       : $(git branch --show-current 2>/dev/null)"
 echo "Code version : $(git log -1 --format='%h %s' 2>/dev/null)"
 echo "Built version: $(cut -c1-7 .next/demo-commit 2>/dev/null || echo unknown)"
 echo "Codespace    : ${CODESPACE_NAME:-not found}"
