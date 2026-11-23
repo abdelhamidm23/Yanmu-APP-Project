@@ -15,6 +15,7 @@ import { formatTimestamp } from "@/lib/format";
 import { cairoTimeOf, todayInCairo } from "@/lib/calendar";
 import { buildWorkbook, xlsxResponse } from "@/lib/excel";
 import { MONEY_LISTS, moneyExport } from "@/db/money-export";
+import { SAFETY_LISTS, safetyExport } from "@/db/safety-export";
 
 const notFound = () => new Response("Not found", { status: 404 });
 
@@ -30,6 +31,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
 
   // Money lists (Phase 4).
   if ((MONEY_LISTS as readonly string[]).includes(list)) return (await moneyExport(list, url, user, t, locale, stamp)) ?? notFound();
+
+  // Incidents and issues (Phase 5).
+  if ((SAFETY_LISTS as readonly string[]).includes(list)) return (await safetyExport(list, url, user, t, locale, stamp)) ?? notFound();
 
   // Staff and their attendance days (spec §8.3). Row-level security limits the rows.
   if (list === "staff" || list === "staff-days") {

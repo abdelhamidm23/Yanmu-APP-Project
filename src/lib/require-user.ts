@@ -24,6 +24,9 @@ import {
   canUseCashBox,
   canReconcileCash,
   canEditFees,
+  canOpenSafety,
+  canReportSafety,
+  canViewSafety,
 } from "./permissions";
 import { getCurrentUser, type CurrentUser } from "./session";
 
@@ -100,6 +103,14 @@ export async function requireMoney(
     : area === "expense-new" ? canRecordExpense(user)
     : area === "cash" ? canUseCashBox(user) || canReconcileCash(user) || canDecideMoney(user)
     : canEditFees(user);
+  if (!allowed) notFound();
+  return user;
+}
+
+/** Incidents and issues (spec §5, Phase 5). Row-level security narrows the rows (reporters see their own). */
+export async function requireSafety(locale: string, area: "open" | "report" | "view" = "open"): Promise<CurrentUser & { activeRole: Role | null }> {
+  const user = await requireUser(locale);
+  const allowed = area === "open" ? canOpenSafety(user) : area === "report" ? canReportSafety(user) : canViewSafety(user);
   if (!allowed) notFound();
   return user;
 }

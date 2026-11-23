@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { requireSection } from "@/lib/require-user";
-import { canOpenSettings, isOrgAdmin, canOpenToday, canViewMoney, canViewPayStatus, canUseCashBox, canReconcileCash, canDecideMoney, canViewExpenses, canRequestCredit, canRecordExpense, canTakeAttendance, canViewChildren, canViewStaff, canViewStaffAttendance } from "@/lib/permissions";
+import { canOpenSettings, isOrgAdmin, canOpenToday, canViewMoney, canViewPayStatus, canUseCashBox, canReconcileCash, canDecideMoney, canViewExpenses, canTakeAttendance, canViewChildren, canViewStaff, canViewStaffAttendance, canOpenSafety } from "@/lib/permissions";
 import { canOpenSection, requiresMfa } from "@/lib/roles";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -9,6 +9,7 @@ import { Button, buttonClasses } from "@/components/ui/Button";
 import { forgetPin, savePreferences, setUpPin, switchRole } from "./actions";
 import { SignOutButton } from "./SignOutButton";
 import { SettingsMenu } from "@/components/settings/SettingsMenu";
+import { PushToggle } from "@/components/alerts/PushToggle";
 
 function Segment({ name, options, value }: { name: string; options: { value: string; label: string; lang?: string }[]; value: string }) {
   return (
@@ -45,6 +46,9 @@ export default async function MorePage({
     { show: canTakeAttendance(user) && !hasTab("roll-call"), href: "/roll-call", title: t("attendance.rollCallTitle"), text: t("more.rollCallLink"), id: "open-roll-call" },
     { show: canViewChildren(user) && !hasTab("children"), href: "/children", title: t("more.children"), text: t("more.childrenLink"), id: "open-children" },
     { show: canViewStaff(user) && !hasTab("staff"), href: "/staff", title: t("staff.title"), text: t("more.staffLink"), id: "open-staff" },
+    { show: canOpenSafety(user), href: "/incidents", title: t("safety.incidents.title"), text: t("more.incidentsLink"), id: "open-incidents" },
+    { show: canOpenSafety(user) && !hasTab("issues"), href: "/issues", title: t("safety.issues.title"), text: t("more.issuesLink"), id: "open-issues" },
+    { show: !hasTab("inbox"), href: "/inbox", title: t("alerts.inboxTitle"), text: t("more.alertsLink"), id: "open-alerts" },
     { show: canViewStaffAttendance(user) && !hasTab("staff-attendance"), href: "/staff-attendance", title: t("staffAttendance.title"), text: t("more.staffAttendanceLink"), id: "open-staff-attendance" },
   ].filter((l) => l.show);
   // Money (Phase 4): the screens a role reaches beyond its own tabs.
@@ -61,13 +65,6 @@ export default async function MorePage({
       id: "open-cash-box",
     },
     { show: canViewExpenses(user), href: "/expenses", title: t("money.links.expenses"), text: t("more.expensesLink"), id: "open-expenses" },
-    {
-      show: (canDecideMoney(user) || canRequestCredit(user) || canRecordExpense(user)) && !hasTab("inbox"),
-      href: "/inbox",
-      title: t("money.links.approvals"),
-      text: t("more.approvalsLink"),
-      id: "open-inbox",
-    },
     { show: canViewMoney(user) && !isOrgAdmin(user), href: "/settings/price-locks", title: t("money.links.priceLocks"), text: t("more.priceLocksLink"), id: "open-price-locks" },
   ].filter((l) => l.show);
 
@@ -163,6 +160,11 @@ export default async function MorePage({
           </div>
         </Card>
       ) : null}
+
+      <Card className="flex flex-col gap-3">
+        <h3 className="text-row-title font-semibold">{t("alerts.push.title")}</h3>
+        <PushToggle />
+      </Card>
 
       <Card className="flex flex-col gap-3">
         <h3 className="text-row-title font-semibold">{t("more.security")}</h3>

@@ -85,6 +85,20 @@
       "when": 1795424400000,
       "tag": "0011_money_owner_cm_accountant",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1795430322858,
+      "tag": "0012_phase5_safety",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1795430323495,
+      "tag": "0013_phase5_safety_rls",
+      "breakpoints": true
     }
   ]
 }

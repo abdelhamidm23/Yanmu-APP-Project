@@ -1,14 +1,21 @@
 import { getTranslations } from "next-intl/server";
 import { requireSection } from "@/lib/require-user";
-import { SECTION_PHASE, addActionsFor, type AddAction } from "@/lib/roles";
+import { addActionsFor, type AddAction } from "@/lib/roles";
 import { Link } from "@/i18n/navigation";
 import { Card } from "@/components/ui/Card";
 import { formatNumber } from "@/lib/format";
 
 /** Actions that are built so far, and where they open. The rest arrive in later phases. */
-const READY: Partial<Record<AddAction, string>> = { child: "/children/new", "roll-call": "/roll-call", payment: "/payment", expense: "/expenses/new" };
+const READY: Partial<Record<AddAction, string>> = {
+  child: "/children/new",
+  "roll-call": "/roll-call",
+  payment: "/payment",
+  expense: "/expenses/new",
+  incident: "/incidents/new",
+  issue: "/issues/new",
+};
 /** The phase that builds the actions not ready yet, shown on their button. */
-const LATER: Partial<Record<AddAction, number>> = { incident: SECTION_PHASE.incident, issue: SECTION_PHASE.issues };
+const LATER: Partial<Record<AddAction, number>> = {};
 
 /** "+ Add" sheet (spec §11.1), filtered by the active role. Each action is built in its own phase. */
 export default async function AddPage({

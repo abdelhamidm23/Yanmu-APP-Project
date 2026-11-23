@@ -46,4 +46,11 @@ export const AUDITED_TABLES = [
   "vendor",
   "expense",
   "approval_step",
+  // Phase 5 (drizzle/0013)
+  "incident",
+  "incident_person",
+  "incident_action",
+  "incident_file",
+  "issue",
+  "alert",
 ] as const;

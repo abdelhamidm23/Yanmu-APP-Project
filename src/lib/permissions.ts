@@ -165,3 +165,28 @@ export function myTurnToDecide(
   }
   return null;
 }
+
+/**
+ * Safety and operations (spec §5, Phase 5). The database enforces the same rules (drizzle/0013).
+ *   incidents: teacher (own classes) and front desk report; branch manager and company manager manage;
+ *              owner reads and signs off critical ones. Reporters keep seeing what they reported.
+ *   issues:    teacher and front desk report; branch manager and company manager assign; owner reads.
+ *   accountant and HR: no incidents or issues.
+ */
+export const SAFETY_VIEW_ROLES = ["owner", "company_manager", "branch_manager"] as const;
+export const SAFETY_MANAGER_ROLES = ["branch_manager", "company_manager"] as const;
+export const SAFETY_REPORTER_ROLES = ["teacher", "front_desk", "branch_manager", "company_manager"] as const;
+
+/** Sees every incident and issue of the branch. */
+export const canViewSafety = roleCheck(SAFETY_VIEW_ROLES);
+/** Logs incidents and issues (teachers only for their own classes, checked by the database). */
+export const canReportSafety = roleCheck(SAFETY_REPORTER_ROLES);
+/** Completes reports, adds actions, assigns issues. */
+export const canManageSafety = roleCheck(SAFETY_MANAGER_ROLES);
+/** Reviews and closes incidents; only the owner closes a critical one. */
+export const canReviewIncidents = roleCheck(["company_manager", "owner"]);
+export const canSignOffCritical = roleCheck(["owner"]);
+/** Opens the incident and issue lists at all (everyone who sees or reports). */
+export function canOpenSafety(user: U): boolean {
+  return canViewSafety(user) || canReportSafety(user);
+}
