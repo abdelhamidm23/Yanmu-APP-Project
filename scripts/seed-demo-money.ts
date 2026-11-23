@@ -111,8 +111,8 @@ export async function seedDemoMoney(db: Db): Promise<string> {
   for (const b of branches) {
     const code = b.code as "A" | "B";
     const u = users[code];
-    // Who takes payments and runs the cash box: the accountant (the branch manager if there is none).
-    const cashier = users.accountant ?? u.bm;
+    // Who takes payments and runs the cash box: the accountant (owner, 2026-11-23).
+    const cashier = users.accountant;
     const p = PRICES[code];
 
     // Fee list in force from the first demo month (only when the branch has no real one).
@@ -240,10 +240,10 @@ export async function seedDemoMoney(db: Db): Promise<string> {
               isDemo: true,
             });
             receipts++;
-            // One payment was keyed twice by mistake last month and voided by the branch manager (a second person, spec §8.4.3).
-            if (code === "A" && !voided && m === months[1] && method !== "cash" && u.bm && u.bm !== cashier) {
+            // One payment was keyed twice by mistake last month and voided by the company manager (a second person, spec §8.4.3).
+            if (code === "A" && !voided && m === months[1] && method !== "cash" && users.cm && users.cm !== cashier) {
               const dup = await recordPayment(tx, { branchId: b.id, familyId, amount, method, reference: "entered twice", receivedAt: new Date(when.getTime() + 120_000), isDemo: true });
-              await as(tx, u.bm);
+              await as(tx, users.cm);
               await tx.execute(sql`select app_void_payment(${dup.id}::uuid, 'Entered twice by mistake; the first receipt stands.')`);
               await as(tx, cashier);
               voided = true;
@@ -281,7 +281,7 @@ export async function seedDemoMoney(db: Db): Promise<string> {
             if (short) cashShortDone = true;
             const handed = expected - FLOAT > 0n ? expected - FLOAT : 0n;
             await tx.execute(
-              sql`select app_close_cash_session(${s.id}::uuid, ${expected - handed - short}::bigint, ${handed}::bigint, ${handed > 0n ? (code === "A" ? "Branch manager A" : "Branch manager B") : ""})`,
+              sql`select app_close_cash_session(${s.id}::uuid, ${expected - handed - short}::bigint, ${handed}::bigint, ${handed > 0n ? "Bank deposit" : ""})`,
             );
             // The accountant checks closed days older than two days, except the short one.
             if (!short && day < new Date(Date.parse(`${today}T00:00:00Z`) - 2 * 86_400_000).toISOString().slice(0, 10) && users.accountant) {

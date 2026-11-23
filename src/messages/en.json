@@ -109,7 +109,7 @@
     "issues": "Maintenance, equipment and supply issues with due dates.",
     "today": "Today's attendance, team, payments and the daily close.",
     "children": "Children, families, guardians and enrollment.",
-    "add": "Record a payment, expense, incident, issue, child or today's attendance.",
+    "add": "Choose what to add. Each person sees only what their role records.",
     "money": "Billing, collections and expenses.",
     "invoices": "Monthly invoices, late fees and credit notes.",
     "month-close": "Close the month with your Excel template.",
@@ -195,7 +195,8 @@
     "cashBoxLink": "Open, count and close the cash box",
     "expensesLink": "Spending and receipts",
     "approvalsLink": "Requests waiting for a decision",
-    "priceLocksLink": "Children who keep an older price"
+    "priceLocksLink": "Children who keep an older price",
+    "paidLink": "Which families have paid, without amounts."
   },
   "settings": {
     "title": "Settings",

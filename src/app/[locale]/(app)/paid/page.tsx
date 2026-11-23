@@ -3,8 +3,9 @@ import { Link } from "@/i18n/navigation";
 import { withUserDb } from "@/db/rls";
 import { visibleBranches } from "@/db/children";
 import { PAY_STATUS_VIEWS, payStatusList, type PayStatus, type PayStatusView } from "@/db/money";
-import { requireSection } from "@/lib/require-user";
-import { PAY_STATUS_ROLES, hasRoleIn } from "@/lib/permissions";
+import { requireUser } from "@/lib/require-user";
+import { PAY_STATUS_ROLES, canViewPayStatus, hasRoleIn } from "@/lib/permissions";
+import { notFound } from "next/navigation";
 import { daysOverdue } from "@/lib/billing";
 import { todayInCairo } from "@/lib/calendar";
 import { formatNumber, formatPlainDate } from "@/lib/format";
@@ -16,8 +17,9 @@ import { BranchTabs, Flag, pickBranch } from "@/components/children/BranchTabs";
 const TONE: Record<PayStatus, "good" | "attention" | "critical" | "neutral"> = { paid: "good", due: "attention", late: "critical", not_billed: "neutral" };
 
 /**
- * "Who paid" for the front desk (owner, 2026-11-23): which families have paid and which have not, with
- * no amounts. Recording payments, the cash box and the money figures are the accountant's.
+ * "Who paid" for the front desk and the branch manager (owner, 2026-11-23): which families have paid and
+ * which have not, with no amounts. Payments, the cash box and the money figures are for the accountant,
+ * the owner and the company manager.
  */
 export default async function PaidPage({
   params,
@@ -28,7 +30,9 @@ export default async function PaidPage({
 }) {
   const { locale } = await params;
   const sp = await searchParams;
-  const user = await requireSection(locale, "paid");
+  // The front desk's tab; the branch manager opens it from Today and More.
+  const user = await requireUser(locale);
+  if (!canViewPayStatus(user)) notFound();
   const t = await getTranslations("money.paid");
   const tm = await getTranslations("money");
   const loc = locale === "en" ? "en" : "ar";

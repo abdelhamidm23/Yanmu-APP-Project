@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { requireSection } from "@/lib/require-user";
-import { canOpenSettings, isOrgAdmin, canOpenToday, canViewMoney, canUseCashBox, canReconcileCash, canDecideMoney, canViewExpenses, canRequestCredit, canRecordExpense, canTakeAttendance, canViewChildren, canViewStaff, canViewStaffAttendance } from "@/lib/permissions";
+import { canOpenSettings, isOrgAdmin, canOpenToday, canViewMoney, canViewPayStatus, canUseCashBox, canReconcileCash, canDecideMoney, canViewExpenses, canRequestCredit, canRecordExpense, canTakeAttendance, canViewChildren, canViewStaff, canViewStaffAttendance } from "@/lib/permissions";
 import { canOpenSection, requiresMfa } from "@/lib/roles";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -49,6 +49,7 @@ export default async function MorePage({
   ].filter((l) => l.show);
   // Money (Phase 4): the screens a role reaches beyond its own tabs.
   const moneyLinks = [
+    { show: canViewPayStatus(user) && !canViewMoney(user) && !hasTab("paid"), href: "/paid", title: t("money.paid.title"), text: t("more.paidLink"), id: "open-paid" },
     { show: canViewMoney(user) && !hasTab("money"), href: "/money", title: t("money.title"), text: t("more.moneyLink"), id: "open-money" },
     { show: canViewMoney(user) && !hasTab("invoices"), href: "/invoices", title: t("money.links.invoices"), text: t("more.invoicesLink"), id: "open-invoices" },
     { show: canViewMoney(user), href: "/payments", title: t("money.links.payments"), text: t("more.paymentsLink"), id: "open-payments" },

@@ -8,7 +8,7 @@ import { accrueLateFees } from "@/db/billing";
 import { cashVarianceAlerts, moneySummary } from "@/db/money";
 import { Amount } from "@/components/money/Money";
 import { requireArea } from "@/lib/require-user";
-import { canEditRoster, canImportPunches, canRecordPayment, canUseCashBox, canViewMoney, hasRoleIn } from "@/lib/permissions";
+import { canEditRoster, canImportPunches, canRecordPayment, canUseCashBox, canViewMoney, canViewPayStatus, hasRoleIn } from "@/lib/permissions";
 import { stillInAlertTime } from "@/lib/attendance";
 import { cairoTimeOf, cairoWallToUtc, minutesOf, todayInCairo } from "@/lib/calendar";
 import { formatNumber, formatPlainDate, formatTimestamp } from "@/lib/format";
@@ -236,6 +236,11 @@ export default async function TodayPage({
         <Link href={`/children?${q}`} className={buttonClasses("secondary")}>
           {t("childAlerts")}
         </Link>
+        {canViewPayStatus(user, b.id) && !canViewMoney(user, b.id) && user.activeRole !== "front_desk" ? (
+          <Link href={`/paid?${q}`} className={buttonClasses("secondary")} data-testid="open-paid">
+            {tm("paid.title")}
+          </Link>
+        ) : null}
       </nav>
     </div>
   );

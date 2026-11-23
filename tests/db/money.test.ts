@@ -223,18 +223,20 @@ describe("payments and receipts (spec §8.4.3)", () => {
   });
 
   it("a void needs a reason and a second person; the invoice reopens", async () => {
-    const [p] = await commitAs(users.branch_managerA, async (tx) => {
+    const [p] = await commitAs(users.accountantA, async (tx) => {
       const rows = await tx`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'card', 450000) returning id`;
       await tx`insert into payment_allocation (payment_id, invoice_id, branch_id, amount_piastres) values (${rows[0].id}, ${A.invoice}, ${branchA}, 450000)`;
       return rows;
     });
     try {
       expect((await invoiceRow(A.invoice)).status).toBe("paid");
-      await as(users.branch_managerA, async (tx) => {
+      await as(users.accountantA, async (tx) => {
         await expectError(tx, (sp) => sp`select app_void_payment(${p.id}, 'entered twice')`, { message: "own_request" });
       });
-      await as(users.front_deskA, async (tx) => expectError(tx, (sp) => sp`select app_void_payment(${p.id}, 'entered twice')`, denied));
-      await as(users.accountantA, async (tx) => {
+      for (const u of [users.front_deskA, users.branch_managerA]) {
+        await as(u, async (tx) => expectError(tx, (sp) => sp`select app_void_payment(${p.id}, 'entered twice')`, denied));
+      }
+      await as(users.accountantA2, async (tx) => {
         await expectError(tx, (sp) => sp`select app_void_payment(${p.id}, '')`, { message: "reason_required" });
         await tx`select app_void_payment(${p.id}, 'entered twice')`;
         const [inv] = await tx`select status, paid_piastres::int as paid from invoice where id = ${A.invoice}`;
@@ -250,15 +252,19 @@ describe("payments and receipts (spec §8.4.3)", () => {
   });
 });
 
-describe("front desk sees who paid, not amounts (owner, 2026-11-23)", () => {
-  it("reads no money rows and cannot take payments or open the cash box", async () => {
-    await as(users.front_deskA, async (tx) => {
-      for (const t of ["invoice", "invoice_line", "payment", "payment_allocation", "credit_note", "cash_session", "fee_list", "expense"]) {
-        expect(await tx.unsafe(`select 1 from ${t} where branch_id = $1`, [branchA]), t).toHaveLength(0);
-      }
-      await expectError(tx, (sp) => sp`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'card', 100)`, denied);
-      await expectError(tx, (sp) => sp`insert into cash_session (branch_id, date, opening_float_piastres) values (${branchA}, ${today}, 0)`, denied);
-    });
+describe("front desk and branch manager see who paid, not amounts (owner, 2026-11-23)", () => {
+  it("read no money rows and cannot take payments, open the cash box or request credit", async () => {
+    for (const role of ["front_desk", "branch_manager"] as const) {
+      await as(users[`${role}A`], async (tx) => {
+        const tables = ["invoice", "invoice_line", "payment", "payment_allocation", "credit_note", "cash_session", "fee_list", "price_lock"];
+        // The branch manager still records and sees the branch's expenses.
+        if (role === "front_desk") tables.push("expense");
+        for (const t of tables) expect(await tx.unsafe(`select 1 from ${t} where branch_id = $1`, [branchA]), `${role} ${t}`).toHaveLength(0);
+        await expectError(tx, (sp) => sp`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'card', 100)`, denied);
+        await expectError(tx, (sp) => sp`insert into cash_session (branch_id, date, opening_float_piastres) values (${branchA}, ${today}, 0)`, denied);
+        await expectError(tx, (sp) => sp`insert into credit_note (invoice_id, branch_id, amount_piastres, reason, kind) values (${A.invoice}, ${branchA}, 100, 'charged twice', 'correction')`, denied);
+      });
+    }
   });
 
   it("gives each family a status with no amounts; other roles and branches get nothing", async () => {
@@ -311,7 +317,11 @@ describe("approvals for money (spec §8.6, §8.4.5)", () => {
     const req = cn.approval_request_id;
     {
       await as(users.accountantA, async (tx) => expectError(tx, (sp) => sp`select app_decide_money(${req}, 'approve', '')`, denied));
-      await as(users.branch_managerA, async (tx) => expectError(tx, (sp) => sp`select app_decide_money(${req}, 'approve', '')`, denied));
+      await as(users.branch_managerA, async (tx) => {
+        await expectError(tx, (sp) => sp`select app_decide_money(${req}, 'approve', '')`, denied);
+        // Credit notes carry family balances: not for the branch manager (owner, 2026-11-23).
+        expect(await tx`select id from approval_request where id = ${req}`).toHaveLength(0);
+      });
       await as(users.companyOrg, async (tx) => {
         await expectError(tx, (sp) => sp`select app_decide_money(${req}, 'reject', '')`, { message: "reason_required" });
         const [{ app_decide_money: r }] = await tx`select app_decide_money(${req}, 'approve', 'ok')`;
@@ -436,8 +446,11 @@ describe("expenses: routine or not (spec §8.6, D10)", () => {
 });
 
 describe("cash box (spec §8.5)", () => {
-  it("the branch manager opens with a float, takes cash, closes with a variance; only the accountant reconciles", async () => {
+  it("the accountant opens with a float, takes cash and closes with a variance; the branch manager cannot", async () => {
     await as(users.branch_managerA, async (tx) => {
+      await expectError(tx, (sp) => sp`insert into cash_session (branch_id, date, opening_float_piastres) values (${branchA}, ${today}, 100000)`, denied);
+    });
+    await as(users.accountantA, async (tx) => {
       await expectError(tx, (sp) => sp`insert into cash_session (branch_id, date, opening_float_piastres) values (${branchA}, '2026-01-01', 0)`, { message: "not_today" });
       const [s] = await tx`insert into cash_session (branch_id, date, opening_float_piastres) values (${branchA}, ${today}, 100000) returning id`;
       const [p] = await tx`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'cash', 1250000) returning cash_session_id`;
@@ -446,8 +459,10 @@ describe("cash box (spec §8.5)", () => {
       const [{ app_close_cash_session: variance }] = await tx`select app_close_cash_session(${s.id}, 45000, 1200000, 'Branch manager')`;
       expect(Number(variance)).toBe(105000); // 1,000 + 12,500 − 0 − 12,000 − 450 = 1,050 EGP missing
       await expectError(tx, (sp) => sp`select app_close_cash_session(${s.id}, 0, 0, '')`, { message: "already_closed" });
-      await expectError(tx, (sp) => sp`select app_reconcile_cash_session(${s.id})`, denied);
       await expectError(tx, (sp) => sp`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'cash', 1000)`, { message: "cash_box_not_open" });
+      await tx`select set_config('app.user_id', ${users.branch_managerA}, true)`;
+      await expectError(tx, (sp) => sp`select app_reconcile_cash_session(${s.id})`, denied);
+      await expectError(tx, (sp) => sp`select * from app_cash_session_totals(${s.id})`, denied);
     });
   });
 
@@ -457,6 +472,8 @@ describe("cash box (spec §8.5)", () => {
       await as(users.branch_managerA, async (tx) => {
         await tx`insert into expense (branch_id, category_id, spent_on, amount_piastres, payment_method, description, receipt_attachment_id)
                  values (${branchA}, ${A.food}, ${today}, 30000, 'cash', 'Milk', ${A.receipt})`;
+        // The accountant counts the box.
+        await tx`select set_config('app.user_id', ${users.accountantA}, true)`;
         const [t] = await tx`select cash_in::int, cash_out::int from app_cash_session_totals(${s.id})`;
         expect(t).toEqual({ cash_in: 0, cash_out: 30000 });
         const [{ app_close_cash_session: v }] = await tx`select app_close_cash_session(${s.id}, 70000, 0, '')`;
@@ -518,6 +535,9 @@ describe("late fees (spec §8.4.4, D5)", () => {
   it("a waiver is a credit note on the late-fee invoice", async () => {
     const lf = await seedInvoice(branchA, A.family, A.student, "2026-10-01", "2026-10-06", 150000, "late_fee");
     await as(users.branch_managerA, async (tx) => {
+      await expectError(tx, (sp) => sp`insert into credit_note (invoice_id, branch_id, amount_piastres, reason, kind) values (${lf}, ${branchA}, 150000, 'Family emergency', 'waiver')`, denied);
+    });
+    await as(users.accountantA, async (tx) => {
       const [cn] = await tx`insert into credit_note (invoice_id, branch_id, amount_piastres, reason, kind) values (${lf}, ${branchA}, 150000, 'Family emergency', 'waiver') returning approval_request_id`;
       const [r] = await tx`select type from approval_request where id = ${cn.approval_request_id}`;
       expect(r.type).toBe("late_fee_waiver");

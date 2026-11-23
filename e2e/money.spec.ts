@@ -12,10 +12,11 @@ const nextMonth = (() => {
   return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
 })();
 
-test("the branch manager records a cash payment and gets a numbered receipt", async ({ page }) => {
-  await signIn(page, "branch.manager@yanmu.test", "en");
-  await expect(page).not.toHaveURL(/\/login/);
-  await page.goto("/en/payment");
+test("the accountant records a cash payment and gets a numbered receipt", async ({ page }) => {
+  const [a] = await ownerQuery((sql) => sql`select id from branch where code = 'A'`);
+  execSync("pnpm -s seed:dev-users --reset", { stdio: "ignore" });
+  await signInWithNewMfa(page, "accountant@yanmu.test", "en");
+  await page.goto(`/en/payment?branch=${a.id}`);
   // Searching keeps the page in English (owner's review, 2026-11-23).
   await page.getByTestId("family-search").fill("A-");
   await page.getByTestId("family-search").press("Enter");
@@ -33,6 +34,23 @@ test("the branch manager records a cash payment and gets a numbered receipt", as
   // The person who recorded it cannot void it (a second person must).
   await expect(page.getByTestId("void-payment")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("the branch manager sees who paid from Today, but no money screens", async ({ page }) => {
+  await signIn(page, "branch.manager@yanmu.test", "en");
+  await expect(page).toHaveURL(/\/en\/today$/);
+  await expect(page.getByTestId("money-today")).toHaveCount(0);
+  await page.getByTestId("open-paid").click();
+  await expect(page).toHaveURL(/\/en\/paid\?/);
+  await expect(page.getByTestId("paid-row").first().getByTestId("pay-status")).toBeVisible();
+  await expect(page.locator("main")).not.toContainText("EGP");
+  for (const path of ["/en/payment", "/en/cash-box", "/en/money", "/en/invoices", "/en/payments"]) {
+    const response = await page.goto(path);
+    expect(response?.status(), path).toBe(404);
+  }
+  // Expenses stay with the branch manager.
+  const response = await page.goto("/en/expenses/new");
+  expect(response?.status()).toBe(200);
 });
 
 test("the front desk sees who paid, with no amounts, and cannot open the money screens", async ({ page }) => {

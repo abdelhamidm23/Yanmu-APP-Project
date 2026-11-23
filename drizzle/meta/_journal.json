@@ -78,6 +78,13 @@
       "when": 1795420800000,
       "tag": "0010_money_for_accountant",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795424400000,
+      "tag": "0011_money_owner_cm_accountant",
+      "breakpoints": true
     }
   ]
 }

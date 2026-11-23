@@ -149,7 +149,7 @@ export const ADD_ACTIONS = ["payment", "expense", "incident", "issue", "child", 
 export type AddAction = (typeof ADD_ACTIONS)[number];
 
 const ADD_BY_ROLE: Partial<Record<Role, AddAction[]>> = {
-  branch_manager: ["payment", "expense", "incident", "issue", "child", "roll-call"],
+  branch_manager: ["expense", "incident", "issue", "child", "roll-call"],
   accountant: ["payment", "expense"],
 };
 

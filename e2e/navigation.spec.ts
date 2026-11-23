@@ -16,10 +16,11 @@ test("branch manager sees the branch manager tabs and the + Add sheet", async ({
   const nav = page.getByRole("navigation", { name: "Main navigation" });
   await expect(nav.getByRole("link")).toHaveText(["Today", "Children", "Add", "Issues", "More"]);
   await page.getByTestId("nav-add").click();
-  // Phase 2: "Child"; Phase 3: "Daily attendance"; Phase 4: "Payment" and "Expense". The rest arrive in later phases.
+  // Phase 2: "Child"; Phase 3: "Daily attendance"; Phase 4: "Expense". The rest arrive in later phases.
   await expect(page.getByTestId("add-actions").getByRole("button")).toHaveText([/^Incident\s*Phase 5$/, /^Issue\s*Phase 5$/]);
   await expect(page.getByTestId("add-actions").getByRole("link", { name: "Daily attendance" })).toHaveAttribute("href", "/en/roll-call");
-  await expect(page.getByTestId("add-actions").getByRole("link", { name: "Payment" })).toHaveAttribute("href", "/en/payment");
+  // Payments are the accountant's (owner, 2026-11-23).
+  await expect(page.getByTestId("add-actions").getByRole("link", { name: "Payment" })).toHaveCount(0);
   await expect(page.getByTestId("add-actions").getByRole("link", { name: "Expense" })).toHaveAttribute("href", "/en/expenses/new");
   await page.getByTestId("add-child").click();
   await expect(page).toHaveURL(/\/en\/children\/new$/);
