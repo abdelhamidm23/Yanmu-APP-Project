@@ -18,7 +18,7 @@ describe("bottom navigation matches spec §11.1", () => {
     ["company_manager", ["home", "branches", "inbox", "issues", "more"]],
     ["branch_manager", ["today", "children", "add", "issues", "more"]],
     ["accountant", ["money", "invoices", "add", "month-close", "more"]],
-    ["front_desk", ["today", "children", "payment", "cash-box", "more"]],
+    ["front_desk", ["today", "children", "paid", "more"]],
     ["teacher", ["my-class", "roll-call", "incident", "more"]],
   ] as const)("%s", (role, expected) => {
     expect(sections(role)).toEqual(expected);

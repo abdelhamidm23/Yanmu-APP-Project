@@ -6,12 +6,13 @@ import { withUserDb } from "@/db/rls";
 import { branchDirectory, branchRooms } from "@/db/children";
 import { approvalRequest, consentRecord, enrollment, family, guardian, room, student, studentGuardian, studentMedical } from "@/db/schema";
 import { requireChildren } from "@/lib/require-user";
-import { canBreakGlass, canEditChildren, canEditMedical } from "@/lib/permissions";
+import { canBreakGlass, canEditChildren, canEditMedical, canViewMoney } from "@/lib/permissions";
 import { CONSENT_PURPOSES, RELATIONSHIPS, WITHDRAW_REASONS, ageInMonths, childAlerts } from "@/lib/children";
 import { todayInCairo } from "@/lib/calendar";
 import { formatNumber, formatPlainDate } from "@/lib/format";
 import { localName } from "@/lib/i18n-names";
 import { Card } from "@/components/ui/Card";
+import { ChildBilling } from "@/components/money/ChildBilling";
 import { Button } from "@/components/ui/Button";
 import { CheckField, Field, SelectField } from "@/components/settings/Fields";
 import { Flag } from "@/components/children/BranchTabs";
@@ -256,6 +257,10 @@ export default async function ChildPage({
           </details>
         ) : null}
       </Card>
+
+      {canViewMoney(user, s.branchId) ? (
+        <ChildBilling user={user} studentId={s.id} branchId={s.branchId} familyId={s.familyId} locale={locale} today={today} />
+      ) : null}
 
       <Card className="flex flex-col gap-3">
         <h2 className="text-section-title font-semibold">{t("detail.history")}</h2>

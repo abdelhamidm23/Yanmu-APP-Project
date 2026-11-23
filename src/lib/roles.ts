@@ -39,6 +39,7 @@ export const SECTIONS = [
   "month-close",
   "payment",
   "cash-box",
+  "paid",
   "my-class",
   "roll-call",
   "incident",
@@ -117,8 +118,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   front_desk: [
     { section: "today", icon: "sun" },
     { section: "children", icon: "child" },
-    { section: "payment", icon: "plus", primary: true },
-    { section: "cash-box", icon: "cash" },
+    { section: "paid", icon: "receipt" },
     more,
   ],
   teacher: [
@@ -149,7 +149,7 @@ export const ADD_ACTIONS = ["payment", "expense", "incident", "issue", "child", 
 export type AddAction = (typeof ADD_ACTIONS)[number];
 
 const ADD_BY_ROLE: Partial<Record<Role, AddAction[]>> = {
-  branch_manager: ["payment", "expense", "incident", "issue", "child", "roll-call"],
+  branch_manager: ["expense", "incident", "issue", "child", "roll-call"],
   accountant: ["payment", "expense"],
 };
 
@@ -161,7 +161,7 @@ export function addActionsFor(role: Role): AddAction[] {
 export const SECTION_PHASE: Record<Section, number> = {
   home: 7,
   branches: 7,
-  inbox: 7,
+  inbox: 4,
   reports: 7,
   issues: 5,
   today: 3,
@@ -172,6 +172,7 @@ export const SECTION_PHASE: Record<Section, number> = {
   "month-close": 6,
   payment: 4,
   "cash-box": 4,
+  paid: 4,
   "my-class": 3,
   "roll-call": 3,
   incident: 5,

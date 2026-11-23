@@ -65,5 +65,35 @@ for (const s of SETTINGS) {
   }
 }
 
-console.log("Organization, age bands, branches and default settings are ready.");
+// Expense categories (spec §8.10, aligned with the owner's workbooks). Routine by default (A2):
+// food and kitchen, cleaning and hygiene, consumables, learning materials, utilities, small repairs.
+const CATEGORIES: [string, string, string, boolean][] = [
+  ["salaries", "الرواتب والمزايا", "Salaries & benefits", false],
+  ["security", "الأمن", "Security", false],
+  ["marketing", "التسويق", "Marketing", false],
+  ["rent", "الإيجار", "Rent", false],
+  ["utilities", "المرافق (كهرباء ومياه وغاز)", "Utilities", true],
+  ["food", "الطعام والمطبخ", "Food & kitchen", true],
+  ["cleaning", "النظافة والتعقيم", "Cleaning & hygiene", true],
+  ["consumables", "المستهلكات", "Consumables", true],
+  ["learning", "الأدوات التعليمية", "Learning materials", true],
+  ["maintenance", "الصيانة والإصلاحات", "Maintenance & repairs", true],
+  ["transport", "المواصلات", "Transportation", false],
+  ["admin", "مصروفات إدارية", "Administrative", false],
+  ["other", "أخرى", "Other", false],
+];
+for (const [i, [key, nameAr, nameEn, routine]] of CATEGORIES.entries()) {
+  await db.insert(schema.expenseCategory).values({ orgId: org.id, key, nameAr, nameEn, isRoutineDefault: routine, sort: i + 1 }).onConflictDoNothing();
+}
+// A branch with no routine list yet gets the default one.
+const cats = await db.select().from(schema.expenseCategory).where(eq(schema.expenseCategory.orgId, org.id));
+for (const b of await db.select().from(schema.branch).where(eq(schema.branch.orgId, org.id))) {
+  const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(schema.branchRoutineCategory).where(eq(schema.branchRoutineCategory.branchId, b.id));
+  if (n > 0) continue;
+  for (const c of cats.filter((x) => x.isRoutineDefault)) {
+    await db.insert(schema.branchRoutineCategory).values({ branchId: b.id, categoryId: c.id }).onConflictDoNothing();
+  }
+}
+
+console.log("Organization, age bands, branches, expense categories and default settings are ready.");
 await client.end();

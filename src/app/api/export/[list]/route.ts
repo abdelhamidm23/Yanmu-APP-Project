@@ -14,6 +14,7 @@ import { auditFormatter } from "@/lib/audit-format";
 import { formatTimestamp } from "@/lib/format";
 import { cairoTimeOf, todayInCairo } from "@/lib/calendar";
 import { buildWorkbook, xlsxResponse } from "@/lib/excel";
+import { MONEY_LISTS, moneyExport } from "@/db/money-export";
 
 const notFound = () => new Response("Not found", { status: 404 });
 
@@ -26,6 +27,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ list: st
   if (!user || user.mustSetUpMfa) return notFound();
   const t = await getTranslations({ locale });
   const stamp = todayInCairo();
+
+  // Money lists (Phase 4).
+  if ((MONEY_LISTS as readonly string[]).includes(list)) return (await moneyExport(list, url, user, t, locale, stamp)) ?? notFound();
 
   // Staff and their attendance days (spec §8.3). Row-level security limits the rows.
   if (list === "staff" || list === "staff-days") {

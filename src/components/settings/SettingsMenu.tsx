@@ -4,7 +4,7 @@ import { Link } from "@/i18n/navigation";
 
 /**
  * Settings, split into the groups Khaled asked for (review of phases 0 to 3):
- * nursery setup, people and access, and records. Shown on the More page and on /settings.
+ * nursery setup, money, people and access, and records. Shown on the More page and on /settings.
  */
 export const SETTINGS_GROUPS = [
   {
@@ -14,6 +14,14 @@ export const SETTINGS_GROUPS = [
       { href: "/settings/age-bands", key: "ageBands", admin: true },
       { href: "/settings/calendar", key: "calendar", admin: false },
       { href: "/settings/values", key: "values", admin: true },
+    ],
+  },
+  {
+    key: "money",
+    items: [
+      { href: "/settings/fees", key: "fees", admin: true },
+      { href: "/settings/price-locks", key: "priceLocks", admin: true },
+      { href: "/settings/expenses", key: "expenseCategories", admin: true },
     ],
   },
   { key: "people", items: [{ href: "/settings/users", key: "users", admin: true }] },

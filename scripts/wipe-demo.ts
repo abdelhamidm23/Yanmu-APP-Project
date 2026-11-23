@@ -1,6 +1,6 @@
 /**
- * Removes every demo child, family, guardian, enrollment, waitlist entry, staff member and
- * attendance record (spec §16).
+ * Removes every demo child, family, guardian, enrollment, waitlist entry, staff member,
+ * attendance record and demo money (invoices, payments, cash days, expenses, approvals) (spec §16).
  * Rooms stay: they are settings, and the owner may have renamed them.
  * Usage: pnpm seed:wipe-demo
  */
@@ -10,11 +10,38 @@ import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { fileURLToPath } from "node:url";
 
+/** Vendors the demo adds (scripts/seed-demo-money.ts); removed again when nothing else uses them. */
+export const DEMO_VENDOR_NAMES = ["Cairo Fresh Foods", "Nile Utilities", "Clean Pro Egypt", "Smart Kids Supplies", "Delta Maintenance", "Al Amal Stationery", "Cool Air Services"];
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function wipeDemo(db: PostgresJsDatabase<any>) {
   await db.transaction(async (tx) => {
     const demo = sql`(select id from student where is_demo)`;
     const demoStaff = sql`(select id from staff where is_demo)`;
+    // Money (Phase 4): demo invoices, payments, cash days, expenses and their approvals.
+    const demoInv = sql`(select id from invoice where is_demo)`;
+    const demoPay = sql`(select id from payment where is_demo)`;
+    const demoExp = sql`(select id from expense where is_demo)`;
+    const demoCn = sql`(select id from credit_note where is_demo or invoice_id in (select id from invoice where is_demo))`;
+    const demoReq = sql`(select id from approval_request where expense_id in ${demoExp} or credit_note_id in ${demoCn})`;
+    await tx.execute(sql`delete from payment_allocation where payment_id in ${demoPay} or invoice_id in ${demoInv}`);
+    await tx.execute(sql`delete from approval_step where request_id in ${demoReq}`);
+    await tx.execute(sql`delete from approval_request where id in ${demoReq}`);
+    await tx.execute(sql`delete from credit_note where id in ${demoCn}`);
+    await tx.execute(sql`update expense set cash_session_id = null where not is_demo and cash_session_id in (select id from cash_session where is_demo)`);
+    await tx.execute(sql`delete from expense where is_demo`);
+    await tx.execute(sql`delete from payment where is_demo`);
+    await tx.execute(sql`delete from invoice_line where invoice_id in ${demoInv}`);
+    await tx.execute(sql`delete from invoice where is_demo`);
+    await tx.execute(sql`delete from cash_session where is_demo and not exists (select 1 from payment p where p.cash_session_id = cash_session.id)`);
+    await tx.execute(sql`delete from price_lock where is_demo or student_id in ${demo}`);
+    await tx.execute(sql`delete from student_service where student_id in ${demo}`);
+    await tx.execute(sql`delete from fee_list_item where fee_list_id in (select id from fee_list where is_demo)`);
+    await tx.execute(sql`delete from fee_list where is_demo`);
+    await tx.execute(sql`delete from attachment where file_name = 'demo-receipt.png' and not exists (select 1 from expense e where e.receipt_attachment_id = attachment.id)`);
+    await tx.execute(sql`delete from vendor where name in ${sql.raw(`(${DEMO_VENDOR_NAMES.map((n) => `'${n}'`).join(", ")})`)}
+                         and not exists (select 1 from expense e where e.vendor_id = vendor.id)`);
+    await tx.execute(sql`delete from doc_sequence where kind like '%\_demo'`);
     await tx.execute(sql`delete from student_attendance where student_id in ${demo}`);
     await tx.execute(sql`delete from pickup_refusal where student_id in ${demo}`);
     await tx.execute(sql`delete from ratio_snapshot where is_demo`);
