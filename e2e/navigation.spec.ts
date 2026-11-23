@@ -16,8 +16,10 @@ test("branch manager sees the branch manager tabs and the + Add sheet", async ({
   const nav = page.getByRole("navigation", { name: "Main navigation" });
   await expect(nav.getByRole("link")).toHaveText(["Today", "Children", "Add", "Issues", "More"]);
   await page.getByTestId("nav-add").click();
-  // Phase 2: "Child"; Phase 3: "Daily attendance"; Phase 4: "Expense". The rest arrive in later phases.
-  await expect(page.getByTestId("add-actions").getByRole("button")).toHaveText([/^Incident\s*Phase 5$/, /^Issue\s*Phase 5$/]);
+  // Every action is built now (Phase 5 added Incident and Issue).
+  await expect(page.getByTestId("add-actions").getByRole("button")).toHaveCount(0);
+  await expect(page.getByTestId("add-actions").getByRole("link", { name: "Incident" })).toHaveAttribute("href", "/en/incidents/new");
+  await expect(page.getByTestId("add-actions").getByRole("link", { name: "Issue" })).toHaveAttribute("href", "/en/issues/new");
   await expect(page.getByTestId("add-actions").getByRole("link", { name: "Daily attendance" })).toHaveAttribute("href", "/en/roll-call");
   // Payments are the accountant's (owner, 2026-11-23).
   await expect(page.getByTestId("add-actions").getByRole("link", { name: "Payment" })).toHaveCount(0);
@@ -29,7 +31,8 @@ test("branch manager sees the branch manager tabs and the + Add sheet", async ({
 test("the server refuses screens outside your role (not just hidden tabs)", async ({ page }) => {
   await signIn(page, "teacher@yanmu.test", "en");
   await expect(page).toHaveURL(/\/en\/my-class$/);
-  for (const path of ["/en/inbox", "/en/home", "/en/month-close", "/en/cash-box"]) {
+  // The inbox is everyone's (their own alerts); closing and money screens are not a teacher's.
+  for (const path of ["/en/home", "/en/month-close", "/en/cash-box", "/en/daily-close", "/en/figures"]) {
     const response = await page.goto(path);
     expect(response?.status(), path).toBe(404);
   }

@@ -14,7 +14,16 @@ const yesterday = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo" })
 async function clearTeacherRoom() {
   await ownerQuery(async (sql) => {
     const room = sql`(select r.id from room r join branch b on b.id = r.branch_id where b.code = 'A' and r.name_en = 'Toddlers 1')`;
-    await sql`delete from pickup_refusal where student_id in (select student_id from enrollment where room_id in ${room}) and happened_at >= now() - interval '1 day'`;
+    const refusals = sql`(select id from pickup_refusal where student_id in (select student_id from enrollment where room_id in ${room}) and happened_at >= now() - interval '1 day')`;
+    // A refused pickup also opens an incident (Phase 5): remove those first.
+    const incidents = sql`(select id from incident where pickup_refusal_id in ${refusals})`;
+    await sql`delete from notification_delivery where notification_id in (select id from notification where alert_id in (select id from alert where subject_id in ${incidents}))`;
+    await sql`delete from notification where alert_id in (select id from alert where subject_id in ${incidents})`;
+    await sql`delete from alert where subject_id in ${incidents}`;
+    await sql`delete from incident_person where incident_id in ${incidents}`;
+    await sql`delete from incident_action where incident_id in ${incidents}`;
+    await sql`delete from incident where id in ${incidents}`;
+    await sql`delete from pickup_refusal where id in ${refusals}`;
     await sql`delete from student_attendance where room_id in ${room} and date = ${today}`;
     return [];
   });
