@@ -1,6 +1,6 @@
 /**
  * Removes every demo child, family, guardian, enrollment, waitlist entry, staff member,
- * attendance record and demo money (invoices, payments, cash days, expenses, approvals) (spec §16).
+ * attendance record, demo money (invoices, payments, cash days, expenses, approvals) and demo incidents and issues (spec §16).
  * Rooms stay: they are settings, and the owner may have renamed them.
  * Usage: pnpm seed:wipe-demo
  */
@@ -24,6 +24,17 @@ export async function wipeDemo(db: PostgresJsDatabase<any>) {
     const demoExp = sql`(select id from expense where is_demo)`;
     const demoCn = sql`(select id from credit_note where is_demo or invoice_id in (select id from invoice where is_demo))`;
     const demoReq = sql`(select id from approval_request where expense_id in ${demoExp} or credit_note_id in ${demoCn})`;
+    // Safety (Phase 5): demo incidents, issues and their alerts, before the children they point at.
+    const demoIncident = sql`(select id from incident where is_demo or pickup_refusal_id in (select id from pickup_refusal where student_id in ${demo}))`;
+    const demoAlert = sql`(select id from alert where is_demo or subject_id in ${demoIncident} or subject_id in (select id from issue where is_demo))`;
+    await tx.execute(sql`delete from notification_delivery where notification_id in (select id from notification where alert_id in ${demoAlert})`);
+    await tx.execute(sql`delete from notification where alert_id in ${demoAlert}`);
+    await tx.execute(sql`delete from alert where id in ${demoAlert}`);
+    await tx.execute(sql`delete from incident_file where incident_id in ${demoIncident}`);
+    await tx.execute(sql`delete from incident_action where incident_id in ${demoIncident}`);
+    await tx.execute(sql`delete from incident_person where incident_id in ${demoIncident} or student_id in ${demo}`);
+    await tx.execute(sql`delete from incident where id in ${demoIncident}`);
+    await tx.execute(sql`delete from issue where is_demo`);
     await tx.execute(sql`delete from payment_allocation where payment_id in ${demoPay} or invoice_id in ${demoInv}`);
     await tx.execute(sql`delete from approval_step where request_id in ${demoReq}`);
     await tx.execute(sql`delete from approval_request where id in ${demoReq}`);

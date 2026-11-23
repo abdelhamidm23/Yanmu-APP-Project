@@ -1978,7 +1978,6 @@
     },
     "inboxTitle": "Alerts for you",
     "none": "No alerts.",
-    "raised": "{when}",
     "step": "Passed up to you (step {n})",
     "ackedBy": "{name} is on it ({when})",
     "handled": "Handled",

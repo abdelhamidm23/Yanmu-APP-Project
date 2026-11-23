@@ -20,6 +20,7 @@ import { addDays, addMonths } from "../src/lib/children";
 import { wipeDemo } from "./wipe-demo";
 import { seedDemoAttendance } from "./seed-demo-attendance";
 import { seedDemoMoney } from "./seed-demo-money";
+import { seedDemoSafety } from "./seed-demo-safety";
 
 if (process.env.NODE_ENV === "production" && process.env.DEMO_MODE !== "true") {
   console.error("Refusing to add demo data in production (only allowed when DEMO_MODE=true).");
@@ -127,6 +128,7 @@ if (existing.n > 0 && !reset) {
   console.log(`Demo children already there (${existing.n}). Use --reset to recreate them.`);
   console.log(await seedDemoAttendance(db));
   console.log(await seedDemoMoney(db));
+console.log(await seedDemoSafety(db));
   await client.end();
   process.exit(0);
 }
@@ -256,4 +258,5 @@ for (const code of ["A", "B"] as const) {
 console.log(`Demo children ready: ${total} (Yanmu 92, Norvale 61) and a waitlist of 9 at Yanmu.`);
 console.log(await seedDemoAttendance(db));
 console.log(await seedDemoMoney(db));
+console.log(await seedDemoSafety(db));
 await client.end();
