@@ -71,6 +71,13 @@
       "when": 1795341332586,
       "tag": "0009_phase4_money_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795420800000,
+      "tag": "0010_money_for_accountant",
+      "breakpoints": true
     }
   ]
 }

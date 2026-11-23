@@ -5,7 +5,7 @@
  * most families pay in the first days of the month, some late, a few are behind).
  *
  * The days are played in order, as they would have happened: the invoice run on the 1st, late fees
- * each working day, payments at the front desk, cash box opened and closed, expenses by the branch
+ * each working day, payments taken by the accountant, cash box opened and closed, expenses by the branch
  * manager, approvals by the company manager and owner. Every row is made up and flagged is_demo;
  * demo documents have their own numbers (DEMO-A-R2026-00001), so wiping them leaves no gap in real ones.
  * Runs once: if demo invoices already exist it only catches up today (cash box and late fees).
@@ -76,8 +76,8 @@ export async function seedDemoMoney(db: Db): Promise<string> {
     owner: await userId(db, "owner@yanmu.test"),
     cm: await userId(db, "company.manager@yanmu.test"),
     accountant: await userId(db, "accountant@yanmu.test"),
-    A: { bm: await userId(db, "branch.manager@yanmu.test"), fd: await userId(db, "front.desk@yanmu.test") },
-    B: { bm: await userId(db, "branch.manager.b@yanmu.test"), fd: await userId(db, "multi.role@yanmu.test") },
+    A: { bm: await userId(db, "branch.manager@yanmu.test") },
+    B: { bm: await userId(db, "branch.manager.b@yanmu.test") },
   };
 
   if (already.n > 0) {
@@ -111,6 +111,8 @@ export async function seedDemoMoney(db: Db): Promise<string> {
   for (const b of branches) {
     const code = b.code as "A" | "B";
     const u = users[code];
+    // Who takes payments and runs the cash box: the accountant (the branch manager if there is none).
+    const cashier = users.accountant ?? u.bm;
     const p = PRICES[code];
 
     // Fee list in force from the first demo month (only when the branch has no real one).
@@ -217,8 +219,8 @@ export async function seedDemoMoney(db: Db): Promise<string> {
           await accrueLateFees(tx, b.id, day);
           await tx.insert(schema.cashSession).values({ branchId: b.id, date: day, openingFloatPiastres: FLOAT, isDemo: true });
 
-          // Payments at the front desk, in the order the families came.
-          await as(tx, u.fd);
+          // Payments taken by the accountant (owner, 2026-11-23: money is the accountant's), in the order the families came.
+          await as(tx, cashier);
           const todays = [...carry.splice(0), ...(plan.get(day) ?? [])];
           for (const [j, { familyId, mode }] of todays.entries()) {
             const open = await familyOpenInvoices(tx, familyId);
@@ -238,12 +240,12 @@ export async function seedDemoMoney(db: Db): Promise<string> {
               isDemo: true,
             });
             receipts++;
-            // One payment was keyed twice by mistake last month and voided by the accountant (spec §8.4.3).
-            if (code === "A" && !voided && m === months[1] && method !== "cash" && users.accountant) {
+            // One payment was keyed twice by mistake last month and voided by the branch manager (a second person, spec §8.4.3).
+            if (code === "A" && !voided && m === months[1] && method !== "cash" && u.bm && u.bm !== cashier) {
               const dup = await recordPayment(tx, { branchId: b.id, familyId, amount, method, reference: "entered twice", receivedAt: new Date(when.getTime() + 120_000), isDemo: true });
-              await as(tx, users.accountant);
+              await as(tx, u.bm);
               await tx.execute(sql`select app_void_payment(${dup.id}::uuid, 'Entered twice by mistake; the first receipt stands.')`);
-              await as(tx, u.fd);
+              await as(tx, cashier);
               voided = true;
             }
           }
@@ -269,9 +271,9 @@ export async function seedDemoMoney(db: Db): Promise<string> {
             expenses++;
           }
 
-          // Close the box (not today: the front desk is still working).
+          // Close the box (not today: the accountant is still working).
           if (day < today) {
-            await as(tx, u.fd);
+            await as(tx, cashier);
             const [s] = (await tx.execute(sql`select id from cash_session where branch_id = ${b.id} and date = ${day}`)) as unknown as { id: string }[];
             const [tot] = (await tx.execute(sql`select cash_in::text as i, cash_out::text as o from app_cash_session_totals(${s.id}::uuid)`)) as unknown as { i: string; o: string }[];
             const expected = FLOAT + BigInt(tot.i) - BigInt(tot.o);

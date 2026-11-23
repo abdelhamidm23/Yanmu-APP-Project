@@ -115,17 +115,20 @@ export function canViewStaffAttendance(user: U): boolean {
 
 /**
  * Money (spec §5, Phase 4). The database enforces the same rules (drizzle/0009_phase4_money_rls.sql).
- *   view: owner, company manager, branch manager, accountant, front desk
- *   payments: front desk, branch manager, accountant · invoice run: accountant
+ *   view: owner, company manager, branch manager, accountant
+ *   front desk: only which families have paid, no amounts (owner, 2026-11-23)
+ *   payments: branch manager, accountant · invoice run: accountant
  *   credit notes: accountant creates, branch manager requests · decisions: owner, company manager
  *   expenses: owner, company manager, branch manager, accountant view; branch manager and accountant record
- *   cash box: front desk and branch manager; accountant reconciles
+ *   cash box: accountant and branch manager; accountant reconciles
  */
-export const FINANCE_VIEW_ROLES = ["owner", "company_manager", "branch_manager", "accountant", "front_desk"] as const;
-export const PAYMENT_ROLES = ["front_desk", "branch_manager", "accountant"] as const;
+export const FINANCE_VIEW_ROLES = ["owner", "company_manager", "branch_manager", "accountant"] as const;
+/** Who sees which families have paid (status only): the money viewers and the front desk. */
+export const PAY_STATUS_ROLES = [...FINANCE_VIEW_ROLES, "front_desk"] as const;
+export const PAYMENT_ROLES = ["branch_manager", "accountant"] as const;
 export const EXPENSE_VIEW_ROLES = ["owner", "company_manager", "branch_manager", "accountant"] as const;
 export const EXPENSE_ROLES = ["branch_manager", "accountant"] as const;
-export const CASH_ROLES = ["front_desk", "branch_manager"] as const;
+export const CASH_ROLES = ["accountant", "branch_manager"] as const;
 export const DECIDER_ROLES = ["owner", "company_manager"] as const;
 export const CREDIT_ROLES = ["accountant", "branch_manager"] as const;
 export const VOID_ROLES = ["branch_manager", "accountant", "company_manager"] as const;
@@ -134,6 +137,7 @@ const roleCheck = (roles: readonly RoleName[]) => (user: U, branchId?: string) =
   branchId ? hasRoleIn(user, roles, branchId) : hasAnyRole(user, roles);
 
 export const canViewMoney = roleCheck(FINANCE_VIEW_ROLES);
+export const canViewPayStatus = roleCheck(PAY_STATUS_ROLES);
 export const canRecordPayment = roleCheck(PAYMENT_ROLES);
 export const canRunInvoices = roleCheck(["accountant"]);
 export const canRequestCredit = roleCheck(CREDIT_ROLES);

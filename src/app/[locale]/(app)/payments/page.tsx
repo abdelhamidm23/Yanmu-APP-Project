@@ -63,7 +63,7 @@ export default async function PaymentsPage({
       </PageHeader>
       <BranchTabs branches={branches} current={b.id} path="/payments" locale={locale} label={tm("branch")} />
       <MoneyResult searchParams={sp} />
-      <form className="flex flex-wrap items-end gap-2" action="/payments" method="get">
+      <form className="flex flex-wrap items-end gap-2" action={`/${locale}/payments`} method="get">
         <input type="hidden" name="branch" value={b.id} />
         <div className="flex flex-col gap-1">
           <label htmlFor="pay-date" className="text-[13px] font-medium text-subtle">{t("date")}</label>

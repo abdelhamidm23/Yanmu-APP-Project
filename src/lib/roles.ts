@@ -39,6 +39,7 @@ export const SECTIONS = [
   "month-close",
   "payment",
   "cash-box",
+  "paid",
   "my-class",
   "roll-call",
   "incident",
@@ -117,8 +118,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
   front_desk: [
     { section: "today", icon: "sun" },
     { section: "children", icon: "child" },
-    { section: "payment", icon: "plus", primary: true },
-    { section: "cash-box", icon: "cash" },
+    { section: "paid", icon: "receipt" },
     more,
   ],
   teacher: [
@@ -172,6 +172,7 @@ export const SECTION_PHASE: Record<Section, number> = {
   "month-close": 6,
   payment: 4,
   "cash-box": 4,
+  paid: 4,
   "my-class": 3,
   "roll-call": 3,
   incident: 5,

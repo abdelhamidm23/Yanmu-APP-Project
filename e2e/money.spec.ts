@@ -12,10 +12,14 @@ const nextMonth = (() => {
   return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
 })();
 
-test("front desk records a cash payment and gets a numbered receipt", async ({ page }) => {
-  await signIn(page, "front.desk@yanmu.test", "en");
+test("the branch manager records a cash payment and gets a numbered receipt", async ({ page }) => {
+  await signIn(page, "branch.manager@yanmu.test", "en");
   await expect(page).not.toHaveURL(/\/login/);
   await page.goto("/en/payment");
+  // Searching keeps the page in English (owner's review, 2026-11-23).
+  await page.getByTestId("family-search").fill("A-");
+  await page.getByTestId("family-search").press("Enter");
+  await expect(page).toHaveURL(/\/en\/payment\?.*q=A-/);
   await page.getByTestId("family-results").getByRole("link").first().click();
   await expect(page.getByTestId("family-owes")).toBeVisible();
   await page.locator("#pay-amount").fill("100");
@@ -29,6 +33,30 @@ test("front desk records a cash payment and gets a numbered receipt", async ({ p
   // The person who recorded it cannot void it (a second person must).
   await expect(page.getByTestId("void-payment")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("the front desk sees who paid, with no amounts, and cannot open the money screens", async ({ page }) => {
+  await signIn(page, "front.desk@yanmu.test", "en");
+  await expect(page).not.toHaveURL(/\/login/);
+  const nav = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(nav.getByRole("link")).toHaveText(["Today", "Children", "Who paid", "More"]);
+  await page.getByTestId("nav-paid").click();
+  await expect(page).toHaveURL(/\/en\/paid$/);
+  await page.getByTestId("view-all").click();
+  const first = page.getByTestId("paid-row").first();
+  await expect(first.getByTestId("pay-status")).toHaveText(/^(Paid|Not paid yet|Late|No bill yet)$/);
+  await expect(page.locator("main")).not.toContainText("EGP");
+  // Search by the first family's account number: the page stays in English.
+  const account = (await first.locator(".figure").first().innerText()).trim();
+  await page.getByTestId("paid-search").fill(account);
+  await page.getByTestId("paid-search").press("Enter");
+  await expect(page).toHaveURL(/\/en\/paid\?/);
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.getByTestId("paid-row").first()).toContainText(account);
+  for (const path of ["/en/payment", "/en/cash-box", "/en/money", "/en/invoices", "/en/payments"]) {
+    const response = await page.goto(path);
+    expect(response?.status(), path).toBe(404);
+  }
 });
 
 test("an unusual expense waits for approval and the company manager approves it", async ({ page, browser }) => {

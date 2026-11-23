@@ -98,7 +98,8 @@
     "incident": "Incident",
     "staff": "Staff",
     "staff-attendance": "Attendance",
-    "more": "More"
+    "more": "More",
+    "paid": "Who paid"
   },
   "sections": {
     "home": "Your daily picture: money, children, team and what needs your decision.",
@@ -119,7 +120,8 @@
     "incident": "Log an incident in four quick fields.",
     "staff": "Staff records and documents.",
     "staff-attendance": "Fingerprint attendance uploads.",
-    "more": "Profile, language and settings."
+    "more": "Profile, language and settings.",
+    "paid": "Which families have paid and which have not. Amounts and payments are with the accountant."
   },
   "placeholder": {
     "comingIn": "Coming in phase {phase}",
@@ -133,7 +135,8 @@
     "incident": "Incident",
     "issue": "Issue",
     "child": "Child",
-    "roll-call": "Daily attendance"
+    "roll-call": "Daily attendance",
+    "comingIn": "Phase {phase}"
   },
   "status": {
     "legendTitle": "What the labels mean",
@@ -1342,7 +1345,8 @@
       "reason": "Reason",
       "from": "From",
       "to": "To",
-      "approvedBy": "Approved by"
+      "approvedBy": "Approved by",
+      "since": "Since / due on"
     },
     "run": {
       "title": "Monthly invoice run",
@@ -1644,6 +1648,35 @@
       "endsOn": "ends {date}",
       "startNextMonth": "Start next month",
       "stopEndOfMonth": "Stop at month end"
+    },
+    "paid": {
+      "title": "Who paid",
+      "help": "Which families have paid their fees and which have not. Amounts are not shown here: for those, and to take a payment, ask the accountant.",
+      "views": "Show",
+      "view": {
+        "unpaid": "Not paid",
+        "late": "Late",
+        "paid": "Paid",
+        "all": "All"
+      },
+      "search": "Child, family or account number",
+      "find": "Find",
+      "status": {
+        "paid": "Paid",
+        "due": "Not paid yet",
+        "late": "Late",
+        "not_billed": "No bill yet"
+      },
+      "lateSince": "due {date}, {days} days late",
+      "dueOn": "due {date}",
+      "noMatch": "No family matches this search.",
+      "empty": {
+        "unpaid": "Every family has paid.",
+        "late": "No family is late.",
+        "paid": "No family has paid in full yet.",
+        "all": "No families in this branch yet."
+      },
+      "askAccountant": "A parent asks how much they owe or wants to pay? Send them to the accountant."
     }
   }
 }

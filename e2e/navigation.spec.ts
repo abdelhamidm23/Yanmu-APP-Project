@@ -17,7 +17,7 @@ test("branch manager sees the branch manager tabs and the + Add sheet", async ({
   await expect(nav.getByRole("link")).toHaveText(["Today", "Children", "Add", "Issues", "More"]);
   await page.getByTestId("nav-add").click();
   // Phase 2: "Child"; Phase 3: "Daily attendance"; Phase 4: "Payment" and "Expense". The rest arrive in later phases.
-  await expect(page.getByTestId("add-actions").getByRole("button")).toHaveText(["Incident", "Issue"]);
+  await expect(page.getByTestId("add-actions").getByRole("button")).toHaveText([/^Incident\s*Phase 5$/, /^Issue\s*Phase 5$/]);
   await expect(page.getByTestId("add-actions").getByRole("link", { name: "Daily attendance" })).toHaveAttribute("href", "/en/roll-call");
   await expect(page.getByTestId("add-actions").getByRole("link", { name: "Payment" })).toHaveAttribute("href", "/en/payment");
   await expect(page.getByTestId("add-actions").getByRole("link", { name: "Expense" })).toHaveAttribute("href", "/en/expenses/new");

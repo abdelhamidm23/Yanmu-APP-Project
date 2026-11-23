@@ -183,3 +183,31 @@ export async function cashVarianceAlerts(tx: Tx, branchId: string, today: string
       and abs(variance_piastres) > app_setting_bigint(${branchId}, 'cash.variance_alert_piastres', 20000)
     order by date desc`)) as unknown as { id: string; date: string; variance: string }[];
 }
+
+export const PAY_STATUS_VIEWS = ["unpaid", "late", "paid", "all"] as const;
+export type PayStatusView = (typeof PAY_STATUS_VIEWS)[number];
+export type PayStatus = "paid" | "due" | "late" | "not_billed";
+
+/**
+ * Which families of a branch have paid (owner, 2026-11-23), with no amounts: the front desk's view.
+ * The status comes from app_family_pay_status, which checks the person's role in the branch.
+ * "unpaid" = due or late. Late families first, longest late first.
+ */
+export async function payStatusList(tx: Tx, branchId: string, q: string, view: PayStatusView) {
+  const like = `%${q.trim()}%`;
+  const statuses = view === "unpaid" ? ["due", "late"] : view === "late" ? ["late"] : view === "paid" ? ["paid"] : ["paid", "due", "late", "not_billed"];
+  return (await tx.execute(sql`
+    select f.id, f.account_no as "accountNo", f.display_name as "displayName", ps.status, to_char(ps.since, 'YYYY-MM-DD') as since,
+      coalesce(string_agg(distinct s.full_name_ar, '، '), '') as "childrenAr",
+      coalesce(string_agg(distinct s.full_name_en, ', '), '') as "childrenEn"
+    from app_family_pay_status(${branchId}) ps
+    join family f on f.id = ps.family_id
+    left join student s on s.family_id = f.id and s.status in ('active', 'pending')
+    where ps.status in ${sql.raw(`(${statuses.map((x) => `'${x}'`).join(", ")})`)}
+      and (${q.trim()} = '' or f.account_no ilike ${like} or f.display_name ilike ${like}
+        or exists (select 1 from student c where c.family_id = f.id and (c.full_name_ar ilike ${like} or c.full_name_en ilike ${like})))
+    group by f.id, ps.status, ps.since
+    order by case ps.status when 'late' then 0 when 'due' then 1 when 'not_billed' then 2 else 3 end, ps.since nulls last, f.account_no`)) as unknown as {
+    id: string; accountNo: string; displayName: string; status: PayStatus; since: string | null; childrenAr: string; childrenEn: string;
+  }[];
+}

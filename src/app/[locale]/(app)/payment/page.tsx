@@ -72,7 +72,7 @@ export default async function PaymentPage({
         <PageHeader title={canPay ? t("title") : t("statementTitle")} help={t("findHelp")} />
         <BranchTabs branches={branches} current={b.id} path="/payment" locale={locale} label={tm("branch")} />
         <MoneyResult searchParams={sp} />
-        <form className="flex gap-2" action="/payment" method="get" role="search">
+        <form className="flex gap-2" action={`/${locale}/payment`} method="get" role="search">
           <input type="hidden" name="branch" value={b.id} />
           <label htmlFor="family-q" className="sr-only">{t("search")}</label>
           <input id="family-q" name="q" defaultValue={sp.q ?? ""} placeholder={t("search")} className="min-h-11 flex-1 rounded-button border border-outline bg-surface px-3" data-testid="family-search" />

@@ -3,14 +3,14 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 import type { getTranslations } from "next-intl/server";
 import { withUserDb } from "./rls";
-import { cairoDayStart } from "./money";
+import { PAY_STATUS_VIEWS, cairoDayStart, payStatusList, type PayStatusView } from "./money";
 import { buildWorkbook, xlsxResponse } from "@/lib/excel";
-import { canViewExpenses, canViewMoney } from "@/lib/permissions";
+import { canViewExpenses, canViewMoney, canViewPayStatus } from "@/lib/permissions";
 import { formatPiastres, formatTimestamp } from "@/lib/format";
 import { monthEnd } from "@/lib/billing";
 import type { CurrentUser } from "@/lib/session";
 
-export const MONEY_LISTS = ["invoices", "payments", "expenses", "cash-box", "price-locks"] as const;
+export const MONEY_LISTS = ["invoices", "payments", "expenses", "cash-box", "price-locks", "pay-status"] as const;
 type T = Awaited<ReturnType<typeof getTranslations>>;
 
 /** Piastres → an EGP number for the spreadsheet cell (display only; sums in the app stay in bigint, rule 5). */
@@ -138,6 +138,21 @@ export async function moneyExport(list: string, url: URL, user: CurrentUser, t: 
       locale,
     );
     return xlsxResponse(body, `legacy-prices-${stamp}.xlsx`);
+  }
+
+  // Who paid (the front desk's list): status only, no amounts.
+  if (list === "pay-status") {
+    if (!canViewPayStatus(user, b)) return nf();
+    const v = url.searchParams.get("view") ?? "all";
+    const view: PayStatusView = (PAY_STATUS_VIEWS as readonly string[]).includes(v) ? (v as PayStatusView) : "all";
+    const rows = await withUserDb(user.id, (tx) => payStatusList(tx, b, "", view));
+    const body = await buildWorkbook(
+      t("money.paid.title"),
+      ["account", "family", "childAr", "childEn", "status", "since"].map(c),
+      rows.map((r) => [r.accountNo, r.displayName, r.childrenAr, r.childrenEn, t(`money.paid.status.${r.status}` as "money.paid.status.paid"), r.since ?? ""]),
+      locale,
+    );
+    return xlsxResponse(body, `who-paid-${stamp}.xlsx`);
   }
   return null;
 }

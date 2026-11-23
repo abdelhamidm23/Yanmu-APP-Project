@@ -192,7 +192,7 @@ describe("finance is append-only (rule 6)", () => {
 
 describe("payments and receipts (spec §8.4.3)", () => {
   it("numbers receipts without gaps and keeps the invoice status", async () => {
-    await as(users.front_deskA, async (tx) => {
+    await as(users.accountantA, async (tx) => {
       const pay = async (amount: number) => {
         const [p] = await tx`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'card', ${amount}) returning id, receipt_no`;
         await tx`insert into payment_allocation (payment_id, invoice_id, branch_id, amount_piastres) values (${p.id}, ${A.invoice}, ${branchA}, ${amount})`;
@@ -209,7 +209,7 @@ describe("payments and receipts (spec §8.4.3)", () => {
   });
 
   it("refuses to allocate more than the payment or the balance", async () => {
-    await as(users.front_deskA, async (tx) => {
+    await as(users.accountantA, async (tx) => {
       const [p] = await tx`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'card', 100000) returning id`;
       await expectError(tx, (sp) => sp`insert into payment_allocation (payment_id, invoice_id, branch_id, amount_piastres) values (${p.id}, ${A.invoice}, ${branchA}, 100001)`, { message: "over_allocated" });
       await expectError(tx, (sp) => sp`insert into payment_allocation (payment_id, invoice_id, branch_id, amount_piastres) values (${p.id}, ${B.invoice}, ${branchA}, 100)`, { code: "23514" });
@@ -217,7 +217,7 @@ describe("payments and receipts (spec §8.4.3)", () => {
   });
 
   it("cash needs an open cash box", async () => {
-    await as(users.front_deskA, async (tx) => {
+    await as(users.accountantA, async (tx) => {
       await expectError(tx, (sp) => sp`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'cash', 1000)`, { message: "cash_box_not_open" });
     });
   });
@@ -247,6 +247,50 @@ describe("payments and receipts (spec §8.4.3)", () => {
       await owner`delete from payment where id = ${p.id}`;
       await owner`select app_refresh_invoice(${A.invoice})`;
     }
+  });
+});
+
+describe("front desk sees who paid, not amounts (owner, 2026-11-23)", () => {
+  it("reads no money rows and cannot take payments or open the cash box", async () => {
+    await as(users.front_deskA, async (tx) => {
+      for (const t of ["invoice", "invoice_line", "payment", "payment_allocation", "credit_note", "cash_session", "fee_list", "expense"]) {
+        expect(await tx.unsafe(`select 1 from ${t} where branch_id = $1`, [branchA]), t).toHaveLength(0);
+      }
+      await expectError(tx, (sp) => sp`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'card', 100)`, denied);
+      await expectError(tx, (sp) => sp`insert into cash_session (branch_id, date, opening_float_piastres) values (${branchA}, ${today}, 0)`, denied);
+    });
+  });
+
+  it("gives each family a status with no amounts; other roles and branches get nothing", async () => {
+    const late = await seedFamily(branchA, "PS-late");
+    await seedInvoice(branchA, late.family, late.student, "2026-01-01", "2026-01-05", 100000);
+    const due = await seedFamily(branchA, "PS-due");
+    await seedInvoice(branchA, due.family, due.student, "2099-01-01", "2099-01-05", 100000);
+    const paid = await seedFamily(branchA, "PS-paid");
+    const inv = await seedInvoice(branchA, paid.family, paid.student, "2026-01-01", "2026-01-05", 100000);
+    const [p] = await owner`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${paid.family}, 'card', 100000) returning id`;
+    await owner`insert into payment_allocation (payment_id, invoice_id, branch_id, amount_piastres) values (${p.id}, ${inv}, ${branchA}, 100000)`;
+    const none = await seedFamily(branchA, "PS-none");
+
+    const mine = [late.family, due.family, paid.family, none.family];
+    const statuses = async (user: string, branch: string) =>
+      as(user, async (tx) => {
+        const rows = await tx`select family_id, status, to_char(since, 'YYYY-MM-DD') as since from app_family_pay_status(${branch})`;
+        return Object.fromEntries(rows.filter((r) => mine.includes(r.family_id)).map((r) => [r.family_id, [r.status, r.since]]));
+      });
+    for (const u of [users.front_deskA, users.accountantA, users.branch_managerA]) {
+      expect(await statuses(u, branchA)).toEqual({
+        [late.family]: ["late", "2026-01-05"],
+        [due.family]: ["due", "2099-01-05"],
+        [paid.family]: ["paid", null],
+        [none.family]: ["not_billed", null],
+      });
+    }
+    // The result has no money columns at all.
+    const [fn] = await owner`select proargnames as names from pg_proc where proname = 'app_family_pay_status'`;
+    expect(fn.names).toEqual(["p_branch", "family_id", "status", "since"]);
+    const frontDeskB = await makeUser("fd-B-status", [["front_desk", branchB]]);
+    for (const u of [users.teacherA, users.hrA, frontDeskB]) expect(await statuses(u, branchA), u).toEqual({});
   });
 });
 
@@ -392,8 +436,8 @@ describe("expenses: routine or not (spec §8.6, D10)", () => {
 });
 
 describe("cash box (spec §8.5)", () => {
-  it("opens with a float, takes cash, closes with a variance, then the accountant reconciles", async () => {
-    await as(users.front_deskA, async (tx) => {
+  it("the branch manager opens with a float, takes cash, closes with a variance; only the accountant reconciles", async () => {
+    await as(users.branch_managerA, async (tx) => {
       await expectError(tx, (sp) => sp`insert into cash_session (branch_id, date, opening_float_piastres) values (${branchA}, '2026-01-01', 0)`, { message: "not_today" });
       const [s] = await tx`insert into cash_session (branch_id, date, opening_float_piastres) values (${branchA}, ${today}, 100000) returning id`;
       const [p] = await tx`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'cash', 1250000) returning cash_session_id`;
@@ -483,7 +527,7 @@ describe("late fees (spec §8.4.4, D5)", () => {
 
 describe("demo documents and receipt photos", () => {
   it("demo payments take their own DEMO- numbers and leave the real sequence alone", async () => {
-    await as(users.front_deskA, async (tx) => {
+    await as(users.accountantA, async (tx) => {
       const [f] = await owner`insert into family (branch_id, account_no, display_name, is_demo) values (${branchA}, ${`${run}-demo`}, 'Demo', true) returning id`;
       const [real1] = await tx`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${A.family}, 'card', 100) returning receipt_no, is_demo`;
       const [demo] = await tx`insert into payment (branch_id, family_id, method, amount_piastres) values (${branchA}, ${f.id}, 'card', 100) returning receipt_no, is_demo`;

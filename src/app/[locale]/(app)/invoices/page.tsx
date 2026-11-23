@@ -117,7 +117,7 @@ export default async function InvoicesPage({
       </nav>
 
       {view === "open" || view === "all" ? (
-        <form className="flex gap-2" action="/invoices" method="get">
+        <form className="flex gap-2" action={`/${locale}/invoices`} method="get">
           <input type="hidden" name="branch" value={b.id} />
           <input type="hidden" name="view" value={view} />
           <label htmlFor="inv-q" className="sr-only">{t("search")}</label>

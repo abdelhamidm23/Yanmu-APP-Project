@@ -1,12 +1,14 @@
 import { getTranslations } from "next-intl/server";
 import { requireSection } from "@/lib/require-user";
-import { addActionsFor, type AddAction } from "@/lib/roles";
+import { SECTION_PHASE, addActionsFor, type AddAction } from "@/lib/roles";
 import { Link } from "@/i18n/navigation";
 import { Card } from "@/components/ui/Card";
-import { SectionPlaceholder } from "@/components/SectionPlaceholder";
+import { formatNumber } from "@/lib/format";
 
 /** Actions that are built so far, and where they open. The rest arrive in later phases. */
 const READY: Partial<Record<AddAction, string>> = { child: "/children/new", "roll-call": "/roll-call", payment: "/payment", expense: "/expenses/new" };
+/** The phase that builds the actions not ready yet, shown on their button. */
+const LATER: Partial<Record<AddAction, number>> = { incident: SECTION_PHASE.incident, issue: SECTION_PHASE.issues };
 
 /** "+ Add" sheet (spec §11.1), filtered by the active role. Each action is built in its own phase. */
 export default async function AddPage({
@@ -17,14 +19,15 @@ export default async function AddPage({
   const { locale } = await params;
   const user = await requireSection(locale, "add");
   const t = await getTranslations("add");
+  const tn = await getTranslations();
+  const loc = locale === "en" ? "en" : "ar";
   const actions = addActionsFor(user.activeRole);
   return (
     <div className="flex flex-col gap-4">
-      <SectionPlaceholder
-        section="add"
-        locale={locale === "en" ? "en" : "ar"}
-        digits={user.digits}
-      />
+      <header>
+        <h1 className="text-page-title font-semibold">{tn("nav.add")}</h1>
+        <p className="mt-1 text-muted">{tn("sections.add")}</p>
+      </header>
       <Card>
         <h2 className="text-section-title font-semibold">{t("title")}</h2>
         <ul className="mt-3 grid grid-cols-2 gap-2" data-testid="add-actions">
@@ -42,9 +45,10 @@ export default async function AddPage({
                 <button
                   type="button"
                   disabled
-                  className="flex min-h-12 w-full items-center justify-center rounded-button border border-outline bg-surface px-3 text-[14px] font-medium text-ink disabled:opacity-60"
+                  className="flex min-h-12 w-full flex-col items-center justify-center rounded-button border border-outline bg-surface px-3 text-[14px] font-medium text-ink disabled:opacity-60"
                 >
-                  {t(a)}
+                  <span>{t(a)}</span>
+                  {LATER[a] ? <span className="text-meta font-normal text-subtle">{t("comingIn", { phase: formatNumber(LATER[a], loc, user.digits) })}</span> : null}
                 </button>
               )}
             </li>
