@@ -272,6 +272,8 @@ export async function pendingCritical(tx: Tx, userId: string) {
     select a.id, a.key, a.subject_id as "subjectId", a.raised_at as "raisedAt", b.name_ar as "branchAr", b.name_en as "branchEn"
     from notification n join alert a on a.id = n.alert_id join branch b on b.id = a.branch_id
     where n.user_id = ${userId} and a.tier = 'critical' and a.acknowledged_at is null and a.resolved_at is null
+      -- The person who reported it already knows; they get the alert in their inbox but no banner.
+      and not exists (select 1 from incident i where i.id = a.subject_id and i.created_by = ${userId})
     order by a.raised_at`)) as unknown as { id: string; key: string; subjectId: string | null; raisedAt: Date; branchAr: string; branchEn: string }[];
 }
 

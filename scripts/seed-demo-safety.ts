@@ -176,6 +176,8 @@ export async function seedDemoSafety(db: Db): Promise<string> {
             assignedTo: people.bm[code],
             dueOn: it.dueIn === null ? null : addDays(today, it.dueIn),
             isDemo: true,
+            // Reported a few days before it was due, so "new issues today" stays honest.
+            createdAt: new Date(Date.parse(`${addDays(today, Math.min(-3, (it.dueIn ?? 0) - 7))}T07:30:00Z`)),
             createdBy: people.teacher[code],
             updatedBy: people.teacher[code],
           })
