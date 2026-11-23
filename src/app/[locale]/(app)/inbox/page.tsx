@@ -17,6 +17,10 @@ import { Flag } from "@/components/children/BranchTabs";
 import { Amount, MoneyResult } from "@/components/money/Money";
 import { ApprovalTrail } from "@/components/money/ApprovalTrail";
 import { decide } from "./actions";
+import { reopenRequests } from "@/db/closing";
+import { isOwner } from "@/lib/permissions";
+import { monthLabel } from "@/components/money/Money";
+import { ClosingResult } from "@/components/closing/Closing";
 
 /**
  * Inbox (spec §8.6, §9.4, §10, §11.1): this person's alerts (critical ones first, with "I'm on it"),
@@ -33,6 +37,7 @@ export default async function InboxPage({
   const sp = await searchParams;
   const user = await requireUser(locale);
   const t = await getTranslations("money.inbox");
+  const tr = await getTranslations("closing.month.reopen.inbox");
   const tm = await getTranslations("money");
   const ta = await getTranslations("alerts");
   const ts = await getTranslations("safety");
@@ -40,7 +45,8 @@ export default async function InboxPage({
   const money = canDecideMoney(user) || canRequestCredit(user) || canRecordExpense(user);
   const safetyViewer = canViewSafety(user);
 
-  const { items, alerts, waiting, overdue } = await withUserDb(user.id, async (tx) => {
+  const owner = isOwner(user);
+  const { items, alerts, waiting, overdue, reopens } = await withUserDb(user.id, async (tx) => {
     const open = money ? await openMoneyRequests(tx) : [];
     return {
       items: await Promise.all(open.map(async (r) => ({ r, trail: (await approvalTrail(tx, r.id))!, turn: myTurnToDecide(user, r) }))),
@@ -48,6 +54,8 @@ export default async function InboxPage({
       waiting: await incidentsWaitingFor(tx, user),
       // Managers see every overdue item of their branches (RLS); everyone else only theirs.
       overdue: await overdueActions(tx, null, safetyViewer ? undefined : user.id),
+      // Closed months the accountant asks to reopen: the owner decides (spec §8.10).
+      reopens: owner ? (await reopenRequests(tx)).filter((r) => r.requestedById !== user.id) : [],
     };
   });
   const when = (d: Date | string) => formatTimestamp(new Date(d), loc, user.digits);
@@ -120,7 +128,31 @@ export default async function InboxPage({
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title={ta("inboxTitle")} />
-      {sp.done === "acknowledged" ? <SafetyResult searchParams={sp} /> : <MoneyResult searchParams={sp} />}
+      {sp.done === "acknowledged" ? (
+        <SafetyResult searchParams={sp} />
+      ) : sp.done === "reopened" || sp.done === "keptClosed" ? (
+        <ClosingResult searchParams={sp} />
+      ) : (
+        <MoneyResult searchParams={sp} />
+      )}
+
+      {reopens.length ? (
+        <section className="flex flex-col gap-3" aria-labelledby="inbox-reopen" data-testid="inbox-reopen">
+          <h2 id="inbox-reopen" className="text-section-title font-semibold">{tr("title")}</h2>
+          <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+            {reopens.map((r) => (
+              <li key={r.id}>
+                <Link href={`/month-close?branch=${r.branchId}&month=${r.month.slice(0, 7)}`} className="flex min-h-14 flex-col gap-1 px-4 py-3 hover:bg-bg">
+                  <span className="font-semibold">
+                    {monthLabel(r.month, locale, user.digits)} · {loc === "ar" ? r.branchAr : r.branchEn}
+                  </span>
+                  <span className="text-meta text-muted">{tr("by", { name: r.requestedBy ?? "—" })}: {r.reason}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-3" aria-labelledby="inbox-alerts" data-testid="inbox-alerts">
         <div className="flex flex-wrap items-center justify-between gap-2">

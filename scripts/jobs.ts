@@ -11,6 +11,8 @@
  *   2. Invoice run: from `billing.invoice_day` (default the 1st) once the preview time has passed,
  *      issues this month's tuition invoices for children not invoiced yet. Children who start later
  *      in the month are picked up by the next run, pro-rated by working days.
+ *   3. Figures: keeps yesterday's and today's figures of every branch (kpi_daily_snapshot, spec §7.7),
+ *      so a trend never changes after the fact. Running it again updates today's row.
  *
  * It connects with the owner connection (MIGRATION_DATABASE_URL), so it writes as "the system":
  * no person is recorded as having made these rows.
@@ -48,6 +50,13 @@ export async function runJobs(now = new Date()) {
     const lateLines = await db.transaction((tx) => accrueLateFees(tx, b.id, today));
     console.log(`${b.code}: ${issued} invoices issued, ${lateLines} late-fee days added (${today})`);
   }
+  const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  let kept = 0;
+  for (const d of [yesterday, today]) {
+    const [r] = (await db.execute(sql`select app_snapshot_kpis(${d}::date) as n`)) as unknown as { n: number }[];
+    kept += Number(r?.n ?? 0);
+  }
+  console.log(`figures kept: ${kept} (${yesterday}, ${today})`);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { requireSection } from "@/lib/require-user";
-import { canOpenSettings, isOrgAdmin, canOpenToday, canViewMoney, canViewPayStatus, canUseCashBox, canReconcileCash, canDecideMoney, canViewExpenses, canTakeAttendance, canViewChildren, canViewStaff, canViewStaffAttendance, canOpenSafety } from "@/lib/permissions";
+import { canOpenSettings, isOrgAdmin, canOpenToday, canViewMoney, canViewPayStatus, canUseCashBox, canReconcileCash, canDecideMoney, canViewExpenses, canTakeAttendance, canViewChildren, canViewStaff, canViewStaffAttendance, canOpenSafety, canCloseDay, canViewCloses, canViewMonth } from "@/lib/permissions";
 import { canOpenSection, requiresMfa } from "@/lib/roles";
 import { Card } from "@/components/ui/Card";
 import { Alert } from "@/components/ui/Alert";
@@ -48,6 +48,8 @@ export default async function MorePage({
     { show: canViewStaff(user) && !hasTab("staff"), href: "/staff", title: t("staff.title"), text: t("more.staffLink"), id: "open-staff" },
     { show: canOpenSafety(user), href: "/incidents", title: t("safety.incidents.title"), text: t("more.incidentsLink"), id: "open-incidents" },
     { show: canOpenSafety(user) && !hasTab("issues"), href: "/issues", title: t("safety.issues.title"), text: t("more.issuesLink"), id: "open-issues" },
+    { show: canCloseDay(user) || canViewCloses(user), href: "/daily-close", title: t("closing.day.title"), text: t("more.dailyCloseLink"), id: "open-daily-close" },
+    { show: canViewCloses(user), href: "/figures", title: t("closing.figures.title"), text: t("more.figuresLink"), id: "open-figures" },
     { show: !hasTab("inbox"), href: "/inbox", title: t("alerts.inboxTitle"), text: t("more.alertsLink"), id: "open-alerts" },
     { show: canViewStaffAttendance(user) && !hasTab("staff-attendance"), href: "/staff-attendance", title: t("staffAttendance.title"), text: t("more.staffAttendanceLink"), id: "open-staff-attendance" },
   ].filter((l) => l.show);
@@ -64,6 +66,7 @@ export default async function MorePage({
       text: t("more.cashBoxLink"),
       id: "open-cash-box",
     },
+    { show: canViewMonth(user) && !hasTab("month-close"), href: "/month-close", title: t("closing.month.title"), text: t("more.monthCloseLink"), id: "open-month-close" },
     { show: canViewExpenses(user), href: "/expenses", title: t("money.links.expenses"), text: t("more.expensesLink"), id: "open-expenses" },
     { show: canViewMoney(user) && !isOrgAdmin(user), href: "/settings/price-locks", title: t("money.links.priceLocks"), text: t("more.priceLocksLink"), id: "open-price-locks" },
   ].filter((l) => l.show);

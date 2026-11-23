@@ -18,6 +18,35 @@ export async function buildWorkbook(title: string, columns: SheetColumn[], rows:
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
+/** Several sheets in one .xlsx (the month's Excel pack, the month-close template). */
+export async function buildBook(sheets: { title: string; columns: SheetColumn[]; rows: (string | number | null)[][] }[], locale: "ar" | "en") {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Nursery Command Center";
+  for (const sh of sheets) {
+    const ws = wb.addWorksheet(sh.title.slice(0, 31), { views: [{ rightToLeft: locale === "ar", state: "frozen", ySplit: 1 }] });
+    ws.columns = sh.columns.map((c) => ({ header: c.header, width: c.width ?? 20 }));
+    ws.getRow(1).font = { bold: true };
+    for (const r of sh.rows) ws.addRow(r.map((v) => v ?? ""));
+  }
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+/** The rows of the first sheet from row 2, as plain cell values (column A first). */
+export async function readRows(data: ArrayBuffer, maxRows = 500): Promise<{ row: number; values: TableCell[] }[]> {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(data);
+  const ws = wb.worksheets[0];
+  const out: { row: number; values: TableCell[] }[] = [];
+  if (!ws) return out;
+  ws.eachRow({ includeEmpty: false }, (row, r) => {
+    if (r < 2 || out.length >= maxRows) return;
+    const values: TableCell[] = [];
+    for (let c = 1; c <= 5; c++) values.push(cellPlain(row.getCell(c).value));
+    out.push({ row: r, values });
+  });
+  return out;
+}
+
 export function xlsxResponse(body: Buffer, filename: string) {
   return new Response(new Uint8Array(body), {
     headers: {

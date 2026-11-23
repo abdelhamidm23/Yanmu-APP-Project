@@ -21,6 +21,8 @@ import { PageHeader } from "@/components/settings/Fields";
 import { ResultBanner } from "@/components/settings/ResultBanner";
 import { BranchTabs, Flag, pickBranch } from "@/components/children/BranchTabs";
 import { acknowledgeRefusal } from "./actions";
+import { dailyClose } from "@/db/closing";
+import { canCloseDay, canViewCloses } from "@/lib/permissions";
 
 /** Branch manager / front desk — Today (spec §11.6). Phase 3 parts: roll call, ratios, roster, staff file, pickups. */
 export default async function TodayPage({
@@ -54,12 +56,13 @@ export default async function TodayPage({
       manager ? roomsBreachedSince(tx, b.id, startOfDay) : Promise.resolve([] as string[]),
     ]);
     const safety = canViewSafety(user, b.id) ? await safetySummary(tx, b.id, date) : null;
+    const closedToday = canViewCloses(user, b.id) || canCloseDay(user, b.id) ? { closed: await dailyClose(tx, b.id, date) } : null;
     let money = null;
     if (canViewMoney(user, b.id)) {
       await accrueLateFees(tx, b.id, date);
       money = { s: await moneySummary(tx, b.id, date), cashAlerts: await cashVarianceAlerts(tx, b.id, date) };
     }
-    return { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, money, safety, until: stillInAlertTime(String(settings.get("attendance.closing_time") ?? "16:00"), Number(settings.get("attendance.after_school_minutes") ?? 60)) };
+    return { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, money, safety, closedToday, until: stillInAlertTime(String(settings.get("attendance.closing_time") ?? "16:00"), Number(settings.get("attendance.after_school_minutes") ?? 60)) };
   });
   if (!data) {
     return (
@@ -69,7 +72,8 @@ export default async function TodayPage({
       </div>
     );
   }
-  const { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, until, money, safety } = data;
+  const { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, until, money, safety, closedToday } = data;
+  const tdc = await getTranslations("closing.day");
   const ts = await getTranslations("safety.today");
   const reporter = canReportSafety(user, b.id);
   const tm = await getTranslations("money");
@@ -203,6 +207,20 @@ export default async function TodayPage({
               </Link>
             ) : null}
           </div>
+        </Card>
+      ) : null}
+
+      {closedToday ? (
+        <Card className="flex flex-col gap-2" data-testid="today-close">
+          <h2 className="text-section-title font-semibold">{tdc("title")}</h2>
+          <p className="text-[15px]">
+            {closedToday.closed
+              ? tdc("closedBy", { name: closedToday.closed.closedBy ?? "—", when: formatTimestamp(new Date(closedToday.closed.closedAt), loc, user.digits) })
+              : tdc("todayOpen")}
+          </p>
+          <Link href={`/daily-close?${q}`} className={`${buttonClasses(closedToday.closed || !canCloseDay(user, b.id) ? "secondary" : "primary")} self-start`} data-testid="today-close-link">
+            {closedToday.closed || !canCloseDay(user, b.id) ? tdc("view") : tdc("submit")}
+          </Link>
         </Card>
       ) : null}
 

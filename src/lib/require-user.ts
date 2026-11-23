@@ -27,6 +27,9 @@ import {
   canOpenSafety,
   canReportSafety,
   canViewSafety,
+  canCloseDay,
+  canViewCloses,
+  canViewMonth,
 } from "./permissions";
 import { getCurrentUser, type CurrentUser } from "./session";
 
@@ -111,6 +114,14 @@ export async function requireMoney(
 export async function requireSafety(locale: string, area: "open" | "report" | "view" = "open"): Promise<CurrentUser & { activeRole: Role | null }> {
   const user = await requireUser(locale);
   const allowed = area === "open" ? canOpenSafety(user) : area === "report" ? canReportSafety(user) : canViewSafety(user);
+  if (!allowed) notFound();
+  return user;
+}
+
+/** Daily close, month close and figures (spec §8.9, §8.10, §9). */
+export async function requireClosing(locale: string, area: "day" | "month" | "figures"): Promise<CurrentUser & { activeRole: Role | null }> {
+  const user = await requireUser(locale);
+  const allowed = area === "day" ? canViewCloses(user) || canCloseDay(user) : area === "month" ? canViewMonth(user) : canViewCloses(user);
   if (!allowed) notFound();
   return user;
 }

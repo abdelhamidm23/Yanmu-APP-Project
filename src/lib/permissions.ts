@@ -190,3 +190,19 @@ export const canSignOffCritical = roleCheck(["owner"]);
 export function canOpenSafety(user: U): boolean {
   return canViewSafety(user) || canReportSafety(user);
 }
+
+// Phase 6: closing (spec §8.9, §8.10, §9). Mirrors drizzle/0015.
+export const DAY_CLOSE_ROLES = ["branch_manager", "company_manager"] as const;
+export const CLOSE_VIEW_ROLES = ["owner", "company_manager", "branch_manager", "accountant"] as const;
+export const MONTH_VIEW_ROLES = ["owner", "company_manager", "accountant"] as const;
+
+/** Closes the day of a branch. */
+export const canCloseDay = roleCheck(DAY_CLOSE_ROLES);
+/** Sees the daily closes and the figures (money figures only with canViewMonth). */
+export const canViewCloses = roleCheck(CLOSE_VIEW_ROLES);
+/** Sees the month close, the money figures and their status. */
+export const canViewMonth = roleCheck(MONTH_VIEW_ROLES);
+/** Uploads the month-close template, closes the month, asks to reopen. */
+export const canCloseMonth = roleCheck(["accountant"]);
+/** Decides a request to reopen a closed month. */
+export const canReopenMonth = roleCheck(["owner"]);

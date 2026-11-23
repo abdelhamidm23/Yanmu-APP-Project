@@ -16,6 +16,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   primaryKey,
@@ -1552,4 +1553,133 @@ export const pushSubscription = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [unique("push_subscription_user_endpoint").on(t.userId, t.endpoint)],
+);
+
+// ---------------------------------------------------------------------------
+// Phase 6: closing (spec §6.1, §6.2, §7.5, §7.7, §8.9, §8.10, §9).
+// The branch manager closes each day; the accountant closes each month with the Excel template.
+// ---------------------------------------------------------------------------
+
+export const DAILY_CLOSE_SECTIONS = ["attendance", "pickups", "staff", "payments", "expenses", "incidents", "issues"] as const;
+
+/**
+ * One closed day of one branch (spec §8.9). Each section of `sections` is
+ * { state: 'correct' | 'fix' | 'none', count, note? }: 'none' is a confirmed zero ("Yes, none").
+ */
+export const dailyClose = pgTable(
+  "daily_close",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    date: date("date").notNull(),
+    sections: jsonb("sections").notNull(),
+    notes: text("notes"),
+    closedBy: uuid("closed_by").references(() => appUser.id),
+    closedAt: timestamp("closed_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Closed after the evening deadline (spec §8.9 step 5). */
+    isLate: boolean("is_late").notNull().default(false),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [unique("daily_close_branch_date").on(t.branchId, t.date)],
+);
+
+/** A month of one branch: open, or closed by the accountant (figures Verified). Reopening needs the owner. */
+export const periodClose = pgTable(
+  "period_close",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    month: date("month").notNull(),
+    status: text("status").notNull().default("open"),
+    closedBy: uuid("closed_by").references(() => appUser.id),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    reopenRequestedBy: uuid("reopen_requested_by").references(() => appUser.id),
+    reopenRequestedAt: timestamp("reopen_requested_at", { withTimezone: true }),
+    reopenReason: text("reopen_reason"),
+    reopenedBy: uuid("reopened_by").references(() => appUser.id),
+    reopenedAt: timestamp("reopened_at", { withTimezone: true }),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    unique("period_close_branch_month").on(t.branchId, t.month),
+    check("period_close_status_check", sql`${t.status} IN ('open', 'closed')`),
+    check("period_close_month_check", sql`extract(day from ${t.month}) = 1`),
+  ],
+);
+
+/**
+ * The accountant's month-close lines (spec §7.5, §8.10): 'check' lines compare the app's figure with the
+ * accountant's (a difference needs a note); 'central' lines are costs not recorded in the app (salaries,
+ * rent …); 'balance' lines are the reconciled cash and bank. Each upload is one import batch (rollback).
+ */
+export const periodImportLine = pgTable(
+  "period_import_line",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    periodCloseId: uuid("period_close_id")
+      .notNull()
+      .references(() => periodClose.id),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => importBatch.id),
+    kind: text("kind").notNull(),
+    lineKey: text("line_key").notNull(),
+    categoryId: uuid("category_id").references(() => expenseCategory.id),
+    appPiastres: bigint("app_piastres", { mode: "bigint" }),
+    amountPiastres: bigint("amount_piastres", { mode: "bigint" }).notNull(),
+    note: text("note"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    index("period_import_line_period_idx").on(t.periodCloseId),
+    check("period_import_line_kind_check", sql`${t.kind} IN ('check', 'central', 'balance')`),
+  ],
+);
+
+/** Reconciled cash and bank at the end of a month (spec §7.5), from the month close. */
+export const balanceSnapshot = pgTable(
+  "balance_snapshot",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    month: date("month").notNull(),
+    cashPiastres: bigint("cash_piastres", { mode: "bigint" }),
+    bankPiastres: bigint("bank_piastres", { mode: "bigint" }),
+    batchId: uuid("batch_id").references(() => importBatch.id),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [index("balance_snapshot_branch_month_idx").on(t.branchId, t.month)],
+);
+
+/** The day's figures kept every night (spec §7.7), so trends never change after the fact. */
+export const kpiDailySnapshot = pgTable(
+  "kpi_daily_snapshot",
+  {
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    date: date("date").notNull(),
+    kpiKey: text("kpi_key").notNull(),
+    value: numeric("value"),
+    status: text("status").notNull(),
+    coverage: text("coverage"),
+    takenAt: timestamp("taken_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.branchId, t.date, t.kpiKey] }),
+    check("kpi_snapshot_status_check", sql`${t.status} IN ('verified', 'provisional', 'incomplete', 'not_submitted', 'confirmed')`),
+  ],
 );

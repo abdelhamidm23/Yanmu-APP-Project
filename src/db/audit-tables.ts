@@ -53,4 +53,9 @@ export const AUDITED_TABLES = [
   "incident_file",
   "issue",
   "alert",
+  // Phase 6 (drizzle/0015)
+  "daily_close",
+  "period_close",
+  "period_import_line",
+  "balance_snapshot",
 ] as const;

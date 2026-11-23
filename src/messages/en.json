@@ -199,7 +199,10 @@
     "paidLink": "Which families have paid, without amounts.",
     "incidentsLink": "Incidents reported in the branch, and reporting a new one.",
     "issuesLink": "Maintenance, equipment and supplies: report, assign, follow up.",
-    "alertsLink": "Your alerts, incidents waiting for you, and approvals."
+    "alertsLink": "Your alerts, incidents waiting for you, and approvals.",
+    "dailyCloseLink": "Check the day's records and confirm them, section by section",
+    "figuresLink": "Today's figures with their status, by branch or all branches",
+    "monthCloseLink": "Excel pack, month-close template and closing the month"
   },
   "settings": {
     "title": "Settings",
@@ -490,7 +493,11 @@
         "incident_action": "Incident action",
         "incident_file": "Incident photo",
         "issue": "Issue",
-        "alert": "Alert"
+        "alert": "Alert",
+        "daily_close": "Daily close",
+        "period_close": "Month close",
+        "period_import_line": "Month-close line",
+        "balance_snapshot": "Month-end balance"
       },
       "fields": {
         "full_name": "Name",
@@ -1998,6 +2005,254 @@
       "denied": "Alerts are blocked in this browser's settings. Allow notifications for this site, then try again.",
       "notSetUp": "Push alerts are not set up on the server yet. Alerts still show inside the app.",
       "failed": "Could not turn on alerts. Please try again."
+    }
+  },
+  "closing": {
+    "noBranch": "You are not assigned to a branch yet.",
+    "branch": "Branch",
+    "allBranches": "All branches",
+    "ok": {
+      "saved": "Saved.",
+      "dayClosed": "The day is closed. Thank you.",
+      "rolledBack": "The uploaded figures were removed. You can upload the template again.",
+      "monthClosed": "The month is closed. Its figures are now Verified and its money records are locked.",
+      "reopenAsked": "Your request to reopen the month was sent to the owner.",
+      "reopened": "The month is open again. The accountant can correct it and close it again.",
+      "keptClosed": "The month stays closed."
+    },
+    "errors": {
+      "unknown": "Something went wrong. Please try again.",
+      "invalid": "Please check what you entered.",
+      "forbidden": "You cannot do this.",
+      "section_missing": "Answer every section before closing the day.",
+      "fix_note_required": "For each section marked “To fix”, write what needs fixing.",
+      "already_closed": "This day is already closed.",
+      "invalid_date": "Choose today or an earlier day.",
+      "not_pending": "This was already done.",
+      "month_not_over": "A month can be closed only after it ends.",
+      "template_required": "Upload the month-close template before closing the month.",
+      "difference_note_required": "Every difference between your figures and the app needs a note.",
+      "reason_required": "Write a reason of at least a few words.",
+      "own_request": "You cannot decide your own request.",
+      "month_closed": "This month is closed. Ask the owner to reopen it first."
+    },
+    "day": {
+      "title": "Close the day",
+      "help": "Check the day once, section by section: one tap each. Please close it by {time}.",
+      "dateLabel": "Day",
+      "show": "Show",
+      "late": "Closed late",
+      "closedBy": "Closed by {name}, {when}.",
+      "notWorking": "This is not a working day, so there is nothing to close.",
+      "notClosedYou": "Not closed yet. Check each section below, then close the day.",
+      "notClosedView": "Not closed yet. The branch manager closes the day.",
+      "todayOpen": "Today is not closed yet.",
+      "view": "See the daily close",
+      "sections": {
+        "attendance": "Children's attendance",
+        "pickups": "Pickups",
+        "staff": "Staff attendance",
+        "payments": "Payments and cash box",
+        "expenses": "Expenses",
+        "incidents": "Incidents",
+        "issues": "Issues"
+      },
+      "facts": {
+        "attendance": "{present} present, {absent} absent, {excused} excused. Attendance taken in {done} of {classes} classes.",
+        "notMarked": "{count, plural, one {{n} child not marked.} other {{n} children not marked.}}",
+        "pickups": "{out} went home, {still} still checked in, {refusals} pickups refused.",
+        "staff": "{present} present, {late} late, {absent} absent, of {staff} staff.",
+        "staffNoFile": "No fingerprint file for this day yet.",
+        "payments": "{count} payments recorded, {voided} voided. Cash box: {box}.",
+        "box": {
+          "open": "open",
+          "closed": "closed",
+          "none": "not opened"
+        },
+        "expenses": "{count} expenses recorded, {waiting} waiting for approval.",
+        "incidents": "{count} incidents ({critical} critical), {open} still open.",
+        "issues": "{new} new, {resolved} done, {open} open ({overdue} overdue)."
+      },
+      "empty": {
+        "attendance": "No attendance was recorded for this day. Is that right?",
+        "pickups": "No pickups were recorded. Is that right?",
+        "staff": "No fingerprint file for this day. Is that right?",
+        "payments": "No payments today?",
+        "expenses": "No expenses today?",
+        "incidents": "No incidents today?",
+        "issues": "No new or finished issues today?"
+      },
+      "correct": "Correct",
+      "fix": "To fix",
+      "yesNone": "Yes, none",
+      "answer": {
+        "correct": "Correct",
+        "fix": "To fix",
+        "none": "Confirmed none"
+      },
+      "fixNote": "What needs fixing",
+      "fixNoteHint": "Needed when you choose “To fix”.",
+      "notes": "Notes for management (optional)",
+      "managerNotes": "Notes for management",
+      "submit": "Close the day",
+      "recent": "Recent working days",
+      "closed": "Closed",
+      "lateClosed": "Closed late",
+      "open": "Not closed"
+    },
+    "month": {
+      "title": "Month close",
+      "help": "Download the month's Excel pack, fill in the template with what is not in the app, upload it, then close the month.",
+      "month": "Month",
+      "show": "Show",
+      "closedBy": "Closed by {name}, {when}. Its figures are Verified.",
+      "openDue": "Open. Please close it by the 7th of {month}.",
+      "notOver": "This month is not over yet. Figures stay Provisional until it is closed.",
+      "reopenedBy": "Reopened by {name}, {when}.",
+      "lockedNote": "Invoices, payments and expenses of this month cannot be added or changed while it is closed.",
+      "downloadPack": "Download the Excel pack",
+      "downloadTemplate": "Download the template",
+      "steps": {
+        "pack": "1. The month's Excel pack",
+        "packHelp": "Invoices, payments, expenses, cash box days and credit notes of this branch and month, with a summary.",
+        "template": "2. The month-close template",
+        "templateHelp": "The app's figures are already filled in. Change only what differs, and add a note. Add costs paid centrally (salaries, rent, security, marketing, utilities, administration, other) and the cash and bank balances at the end of the month.",
+        "upload": "3. Upload the filled template",
+        "close": "4. Close the month",
+        "closeHelp": "Once closed, the month's figures are Verified and its money records are locked. Reopening needs the owner."
+      },
+      "lines": {
+        "title": "Figures from the template",
+        "none": "Nothing uploaded for this month yet.",
+        "differences": "{count, plural, one {# line differs from the app (with its note).} other {# lines differ from the app (each with its note).}}",
+        "app": "App:",
+        "difference": "Difference:",
+        "billed": "Billed (tuition and services, after credit notes)",
+        "lateFees": "Late fees billed",
+        "collected": "Payments received",
+        "expense": "Expenses in the app: {name}",
+        "central": "Paid centrally: {name}",
+        "cash": "Cash balance at month end",
+        "bank": "Bank balance at month end"
+      },
+      "uploads": "Uploads",
+      "rollback": "Undo this upload",
+      "inUse": "In use",
+      "replaced": "Replaced or undone",
+      "close": "Close the month",
+      "reopen": {
+        "asked": "{name} asked to reopen this month",
+        "approve": "Reopen the month",
+        "keep": "Keep it closed",
+        "waiting": "Waiting for the owner's decision.",
+        "title": "Reopen this month",
+        "help": "If something must be corrected, ask the owner to reopen the month. The request and the decision are kept in the audit log.",
+        "reason": "Why it needs reopening",
+        "ask": "Ask the owner",
+        "inbox": {
+          "title": "Months to reopen",
+          "by": "Asked by {name}"
+        }
+      },
+      "template": {
+        "sheet": "Month close",
+        "code": "Code (do not change)",
+        "line": "Line",
+        "app": "App figure (EGP)",
+        "yours": "Your figure (EGP)",
+        "note": "Note (needed when different)"
+      },
+      "pack": {
+        "summary": "Summary",
+        "credits": "Credit notes",
+        "creditNo": "Credit note no.",
+        "creditStatus": {
+          "pending_approval": "Waiting for approval",
+          "approved": "Approved",
+          "rejected": "Rejected"
+        }
+      },
+      "upload": {
+        "file": "Filled template (.xlsx)",
+        "check": "Check the file",
+        "checking": "Checking…",
+        "errorsTitle": "{count, plural, one {# line needs fixing in the file.} other {# lines need fixing in the file.}}",
+        "rowLabel": "Row {row}",
+        "rowErrors": {
+          "unknownCode": "the code “{line}” is not one of this month's lines. Keep the codes from the downloaded template.",
+          "notNumber": "{line}: the figure is not a number.",
+          "duplicate": "{line} appears twice.",
+          "noteRequired": "{line}: your figure differs from the app, so write a note.",
+          "missing": "{line}: your figure is missing."
+        },
+        "fixAndRetry": "Fix these lines in Excel and check the file again. Nothing has been saved.",
+        "ready": "{count, plural, one {# line is ready.} other {# lines are ready.}} Differences from the app are in orange.",
+        "appWas": "App: {app}",
+        "save": "Save these {count} lines",
+        "saving": "Saving…",
+        "done": "{count} lines saved.",
+        "refresh": "Show them",
+        "errors": {
+          "noFile": "Choose the filled template first.",
+          "badFile": "This file could not be read. Use the .xlsx template downloaded from this page.",
+          "noRows": "The file has no lines.",
+          "stale": "The app's figures changed since you checked the file. Download the template again."
+        }
+      }
+    },
+    "figures": {
+      "title": "Figures",
+      "help": "Each figure shows how sure it is. A missing figure shows “—”, never zero.",
+      "date": "Day",
+      "show": "Show",
+      "asOf": "Figures for {date}. Monthly figures run from the 1st to this day.",
+      "closedBranches": "{n} of {total} closed",
+      "notSubmitted": "Not submitted",
+      "missingGeneric": "Nobody has entered this yet.",
+      "moneyHidden": "Money figures are for the accountant, the owner and the company manager.",
+      "groups": {
+        "children": "Children",
+        "team": "Team",
+        "safety": "Safety",
+        "closing": "Daily close",
+        "money": "Money (this month)"
+      },
+      "kpis": {
+        "children_active": "Active children",
+        "children_occupancy": "Occupancy",
+        "attendance_day": "Attendance",
+        "staff_present": "Staff present",
+        "ratio_breaches": "Classes short of carers",
+        "incidents_day": "Incidents this day",
+        "incidents_month": "Incidents this month",
+        "incidents_rate": "Incident rate",
+        "incidents_open_critical": "Open critical incidents",
+        "actions_overdue": "Overdue actions and issues",
+        "close_day": "Day closed",
+        "close_rate": "Daily close rate",
+        "money_billed": "Billed",
+        "money_collected": "Collected",
+        "money_collected_day": "Collected this day",
+        "money_collection_rate": "Collection rate",
+        "money_overdue": "Overdue tuition",
+        "money_late_fees_outstanding": "Late fees outstanding",
+        "money_expenses": "Operating expenses",
+        "money_result": "Operating result"
+      },
+      "coverage": {
+        "attendance_day": "Attendance taken in {done} of {total} classes",
+        "ratio_breaches": "Checked in {done} of {total} classes",
+        "close_rate": "Days closed this month: {done} of {total}",
+        "staff_present": "Of {total} staff expected",
+        "money_overdue": "{total} families",
+        "incidents_rate": "Per 100 active children",
+        "children_occupancy": "Of a licence of {total} children"
+      },
+      "missing": {
+        "close_day": "The branch manager has not closed this day yet.",
+        "attendance_day": "No class has taken attendance yet.",
+        "staff_present": "No fingerprint file uploaded for this day."
+      }
     }
   }
 }
