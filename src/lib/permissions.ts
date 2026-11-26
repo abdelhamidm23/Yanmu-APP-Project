@@ -165,3 +165,44 @@ export function myTurnToDecide(
   }
   return null;
 }
+
+/**
+ * Safety and operations (spec §5, Phase 5). The database enforces the same rules (drizzle/0013).
+ *   incidents: teacher (own classes) and front desk report; branch manager and company manager manage;
+ *              owner reads and signs off critical ones. Reporters keep seeing what they reported.
+ *   issues:    teacher and front desk report; branch manager and company manager assign; owner reads.
+ *   accountant and HR: no incidents or issues.
+ */
+export const SAFETY_VIEW_ROLES = ["owner", "company_manager", "branch_manager"] as const;
+export const SAFETY_MANAGER_ROLES = ["branch_manager", "company_manager"] as const;
+export const SAFETY_REPORTER_ROLES = ["teacher", "front_desk", "branch_manager", "company_manager"] as const;
+
+/** Sees every incident and issue of the branch. */
+export const canViewSafety = roleCheck(SAFETY_VIEW_ROLES);
+/** Logs incidents and issues (teachers only for their own classes, checked by the database). */
+export const canReportSafety = roleCheck(SAFETY_REPORTER_ROLES);
+/** Completes reports, adds actions, assigns issues. */
+export const canManageSafety = roleCheck(SAFETY_MANAGER_ROLES);
+/** Reviews and closes incidents; only the owner closes a critical one. */
+export const canReviewIncidents = roleCheck(["company_manager", "owner"]);
+export const canSignOffCritical = roleCheck(["owner"]);
+/** Opens the incident and issue lists at all (everyone who sees or reports). */
+export function canOpenSafety(user: U): boolean {
+  return canViewSafety(user) || canReportSafety(user);
+}
+
+// Phase 6: closing (spec §8.9, §8.10, §9). Mirrors drizzle/0015.
+export const DAY_CLOSE_ROLES = ["branch_manager", "company_manager"] as const;
+export const CLOSE_VIEW_ROLES = ["owner", "company_manager", "branch_manager", "accountant"] as const;
+export const MONTH_VIEW_ROLES = ["owner", "company_manager", "accountant"] as const;
+
+/** Closes the day of a branch. */
+export const canCloseDay = roleCheck(DAY_CLOSE_ROLES);
+/** Sees the daily closes and the figures (money figures only with canViewMonth). */
+export const canViewCloses = roleCheck(CLOSE_VIEW_ROLES);
+/** Sees the month close, the money figures and their status. */
+export const canViewMonth = roleCheck(MONTH_VIEW_ROLES);
+/** Uploads the month-close template, closes the month, asks to reopen. */
+export const canCloseMonth = roleCheck(["accountant"]);
+/** Decides a request to reopen a closed month. */
+export const canReopenMonth = roleCheck(["owner"]);

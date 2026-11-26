@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { withUserDb } from "@/db/rls";
+import { safetySummary } from "@/db/safety";
 import { visibleBranches } from "@/db/children";
 import { branchRoomsToday, lastPunchImport, openRefusals, roomsBreachedSince, stillCheckedIn } from "@/db/attendance";
 import { readOrgSettings } from "@/db/settings";
@@ -8,7 +9,7 @@ import { accrueLateFees } from "@/db/billing";
 import { cashVarianceAlerts, moneySummary } from "@/db/money";
 import { Amount } from "@/components/money/Money";
 import { requireArea } from "@/lib/require-user";
-import { canEditRoster, canImportPunches, canRecordPayment, canUseCashBox, canViewMoney, canViewPayStatus, hasRoleIn } from "@/lib/permissions";
+import { canEditRoster, canImportPunches, canRecordPayment, canUseCashBox, canViewMoney, canViewPayStatus, hasRoleIn, canViewSafety, canReportSafety } from "@/lib/permissions";
 import { stillInAlertTime } from "@/lib/attendance";
 import { cairoTimeOf, cairoWallToUtc, minutesOf, todayInCairo } from "@/lib/calendar";
 import { formatNumber, formatPlainDate, formatTimestamp } from "@/lib/format";
@@ -20,6 +21,8 @@ import { PageHeader } from "@/components/settings/Fields";
 import { ResultBanner } from "@/components/settings/ResultBanner";
 import { BranchTabs, Flag, pickBranch } from "@/components/children/BranchTabs";
 import { acknowledgeRefusal } from "./actions";
+import { dailyClose } from "@/db/closing";
+import { canCloseDay, canViewCloses } from "@/lib/permissions";
 
 /** Branch manager / front desk — Today (spec §11.6). Phase 3 parts: roll call, ratios, roster, staff file, pickups. */
 export default async function TodayPage({
@@ -52,12 +55,14 @@ export default async function TodayPage({
       readOrgSettings(tx),
       manager ? roomsBreachedSince(tx, b.id, startOfDay) : Promise.resolve([] as string[]),
     ]);
+    const safety = canViewSafety(user, b.id) ? await safetySummary(tx, b.id, date) : null;
+    const closedToday = canViewCloses(user, b.id) || canCloseDay(user, b.id) ? { closed: await dailyClose(tx, b.id, date) } : null;
     let money = null;
     if (canViewMoney(user, b.id)) {
       await accrueLateFees(tx, b.id, date);
       money = { s: await moneySummary(tx, b.id, date), cashAlerts: await cashVarianceAlerts(tx, b.id, date) };
     }
-    return { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, money, until: stillInAlertTime(String(settings.get("attendance.closing_time") ?? "16:00"), Number(settings.get("attendance.after_school_minutes") ?? 60)) };
+    return { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, money, safety, closedToday, until: stillInAlertTime(String(settings.get("attendance.closing_time") ?? "16:00"), Number(settings.get("attendance.after_school_minutes") ?? 60)) };
   });
   if (!data) {
     return (
@@ -67,7 +72,10 @@ export default async function TodayPage({
       </div>
     );
   }
-  const { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, until, money } = data;
+  const { branches, b, manager, rooms, refusals, stillIn, lastFile, breachedToday, until, money, safety, closedToday } = data;
+  const tdc = await getTranslations("closing.day");
+  const ts = await getTranslations("safety.today");
+  const reporter = canReportSafety(user, b.id);
   const tm = await getTranslations("money");
   const present = rooms.reduce((s, r) => s + r.present, 0);
   // Rule 1: children not marked yet are not counted as absent; the roll-call line shows what is missing.
@@ -199,6 +207,54 @@ export default async function TodayPage({
               </Link>
             ) : null}
           </div>
+        </Card>
+      ) : null}
+
+      {closedToday ? (
+        <Card className="flex flex-col gap-2" data-testid="today-close">
+          <h2 className="text-section-title font-semibold">{tdc("title")}</h2>
+          <p className="text-[15px]">
+            {closedToday.closed
+              ? tdc("closedBy", { name: closedToday.closed.closedBy ?? "—", when: formatTimestamp(new Date(closedToday.closed.closedAt), loc, user.digits) })
+              : tdc("todayOpen")}
+          </p>
+          <Link href={`/daily-close?${q}`} className={`${buttonClasses(closedToday.closed || !canCloseDay(user, b.id) ? "secondary" : "primary")} self-start`} data-testid="today-close-link">
+            {closedToday.closed || !canCloseDay(user, b.id) ? tdc("view") : tdc("submit")}
+          </Link>
+        </Card>
+      ) : null}
+
+      {safety || reporter ? (
+        <Card className={`flex flex-col gap-2 ${safety?.openCritical ? "border-critical" : ""}`} data-testid="safety-today">
+          <h2 className="text-section-title font-semibold">{ts("title")}</h2>
+          {safety ? (
+            <ul className="flex flex-col gap-1 text-[15px]">
+              {safety.openCritical ? (
+                <li className="font-semibold text-critical">{ts("openCritical", { count: safety.openCritical, n: n(safety.openCritical) })}</li>
+              ) : null}
+              <li>
+                <Link href={`/incidents?${q}`} className="text-brand underline">{ts("openIncidents", { count: safety.openIncidents, n: n(safety.openIncidents) })}</Link>
+              </li>
+              {safety.needsSeen ? <li className="text-attention">{ts("notSeen", { count: safety.needsSeen, n: n(safety.needsSeen) })}</li> : null}
+              <li>
+                <Link href={`/issues?${q}`} className="text-brand underline">{ts("openIssues", { count: safety.openIssues, n: n(safety.openIssues) })}</Link>
+              </li>
+              {safety.overdueIssues + safety.overdueActions ? (
+                <li className="text-critical">
+                  <Link href={`/issues?${q}&view=overdue`} className="underline">
+                    {ts("overdue", { count: safety.overdueIssues + safety.overdueActions, n: n(safety.overdueIssues + safety.overdueActions) })}
+                  </Link>
+                </li>
+              ) : null}
+            </ul>
+          ) : null}
+          {reporter ? (
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/incidents/new?${q}`} className={buttonClasses("danger")} data-testid="today-report-incident">{ts("reportIncident")}</Link>
+              <Link href={`/issues/new?${q}`} className={buttonClasses("secondary")}>{ts("reportIssue")}</Link>
+              {!safety ? <Link href={`/incidents?${q}`} className={buttonClasses("secondary")}>{ts("seeIncidents")}</Link> : null}
+            </div>
+          ) : null}
         </Card>
       ) : null}
 

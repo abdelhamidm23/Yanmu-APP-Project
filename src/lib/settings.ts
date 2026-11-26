@@ -55,6 +55,9 @@ export const SETTINGS = [
   def({ key: "alerts.quiet_hours_end", group: "alerts", kind: "time", schema: time, default: "07:00" }),
   def({ key: "attention.overdue_days", group: "alerts", kind: "integer", schema: z.number().int().min(1), default: 60 }),
   def({ key: "attention.overdue_amount_piastres", group: "alerts", kind: "piastres", schema: piastres, default: 1500000 }),
+  // Home, "Requires your attention" (spec §9.6 items 5 and 6).
+  def({ key: "attention.expense_rise_percent", group: "alerts", kind: "integer", schema: z.number().int().min(1).max(1000), default: 20 }),
+  def({ key: "attention.occupancy_drop_points", group: "alerts", kind: "integer", schema: z.number().int().min(1).max(100), default: 5 }),
 ] as const;
 
 export type SettingKey = (typeof SETTINGS)[number]["key"];

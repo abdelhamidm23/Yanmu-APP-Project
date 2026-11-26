@@ -21,7 +21,7 @@ export async function savePreferences(formData: FormData) {
   const prefs = prefsSchema.parse({ locale: formData.get("locale"), digits: formData.get("digits") });
   await db.update(appUser).set({ locale: prefs.locale, digits: prefs.digits, updatedAt: new Date() }).where(eq(appUser.id, user.id));
   (await cookies()).set("NEXT_LOCALE", prefs.locale, { path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 * 365 });
-  return redirect({ href: "/more?saved=1", locale: prefs.locale });
+  return redirect({ href: "/more/account?saved=1", locale: prefs.locale });
 }
 
 /** Switches the active role. Only roles the person actually holds are accepted. */
@@ -45,9 +45,9 @@ export async function setUpPin(formData: FormData) {
   if (!user) return redirect({ href: "/login", locale });
   const pin = String(formData.get("pin") ?? "");
   const again = String(formData.get("pinAgain") ?? "");
-  if (requiresMfa(user.roles)) return redirect({ href: "/more?pin=needsMfa", locale });
-  if (!PIN_PATTERN.test(pin) || /^(\d)\1+$/.test(pin) || "0123456789".includes(pin)) return redirect({ href: "/more?pin=weak", locale });
-  if (pin !== again) return redirect({ href: "/more?pin=mismatch", locale });
+  if (requiresMfa(user.roles)) return redirect({ href: "/more/account?pin=needsMfa", locale });
+  if (!PIN_PATTERN.test(pin) || /^(\d)\1+$/.test(pin) || "0123456789".includes(pin)) return redirect({ href: "/more/account?pin=weak", locale });
+  if (pin !== again) return redirect({ href: "/more/account?pin=mismatch", locale });
 
   const jar = await cookies();
   const tokens = readDeviceTokens(jar.get(DEVICE_COOKIE)?.value);
@@ -64,7 +64,7 @@ export async function setUpPin(formData: FormData) {
       .where(and(inArray(deviceLogin.tokenHash, hashes.length ? hashes : ["-"]), isNull(deviceLogin.revokedAt)))
   ).map((r) => r.hash);
   jar.set(DEVICE_COOKIE, writeDeviceTokens([...tokens.filter((t) => kept.includes(tokenHash(t))), token]), deviceCookieOptions);
-  return redirect({ href: "/more?pin=ok", locale });
+  return redirect({ href: "/more/account?pin=ok", locale });
 }
 
 /** Removes this person from this phone's quick sign-in list. */
@@ -77,5 +77,5 @@ export async function forgetPin(formData: FormData) {
   const mine = (await db.select({ hash: deviceLogin.tokenHash }).from(deviceLogin).where(eq(deviceLogin.userId, user.id))).map((r) => r.hash);
   await db.delete(deviceLogin).where(and(eq(deviceLogin.userId, user.id), inArray(deviceLogin.tokenHash, tokens.length ? tokens.map(tokenHash) : ["-"])));
   jar.set(DEVICE_COOKIE, writeDeviceTokens(tokens.filter((t) => !mine.includes(tokenHash(t)))), deviceCookieOptions);
-  return redirect({ href: "/more?pin=removed", locale });
+  return redirect({ href: "/more/account?pin=removed", locale });
 }

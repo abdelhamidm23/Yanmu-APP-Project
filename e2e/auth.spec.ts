@@ -67,11 +67,14 @@ test.describe("sign-in", () => {
     await expect(page.getByTestId("backup-codes").locator("li")).toHaveCount(10);
     await page.getByRole("button", { name: "I saved them, continue" }).click();
     await expect(page).toHaveURL(/\/en\/home$/);
-    await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
+    await expect(page.getByTestId("greeting")).toContainText("Owner");
 
     // Sign out, sign in again: now a code is required.
     await page.getByTestId("nav-more").click();
+    await page.getByTestId("open-account").click();
     await expect(page.getByTestId("mfa-status")).toHaveText("Two-step sign-in is on");
+    await page.getByTestId("back-button").click();
+    await expect(page).toHaveURL(/\/en\/more$/);
     await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/en\/login$/);
 

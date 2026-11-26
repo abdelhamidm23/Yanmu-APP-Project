@@ -16,6 +16,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   primaryKey,
@@ -1278,5 +1279,407 @@ export const approvalStep = pgTable(
   (t) => [
     index("approval_step_request_idx").on(t.requestId),
     check("approval_step_decision_check", sql`${t.decision} IN ('approve', 'reject', 'recommend_approve', 'recommend_reject', 'question', 'answer')`),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Phase 5: safety and operations (spec §7.6, §8.7, §8.8, §10).
+// Incidents, the people in them, corrective actions, issues, and alerts with their deliveries.
+// Status changes go through database functions (drizzle/0013); the app may only edit report fields.
+// ---------------------------------------------------------------------------
+
+export const INCIDENT_CATEGORIES = [
+  "injury",
+  "head_injury",
+  "illness",
+  "allergic_reaction",
+  "behaviour",
+  "child_unaccounted",
+  "pickup_unapproved",
+  "child_protection",
+  "hazard",
+  "other",
+] as const;
+export const INCIDENT_SEVERITIES = ["minor", "moderate", "serious", "critical"] as const;
+
+/** Spec §7.6 `incident`. reported_by is created_by. */
+export const incident = pgTable(
+  "incident",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    roomId: uuid("room_id").references(() => room.id),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    category: text("category").notNull(),
+    severity: text("severity").notNull(),
+    description: text("description").notNull(),
+    immediateAction: text("immediate_action").notNull(),
+    /** Who told the guardian, when, and what was said (spec §8.7). */
+    guardianNotifiedAt: timestamp("guardian_notified_at", { withTimezone: true }),
+    guardianNotifiedBy: uuid("guardian_notified_by").references(() => appUser.id),
+    guardianNotificationNote: text("guardian_notification_note"),
+    /** Full report (within 24 hours): what led to it, what was found, what changes. */
+    reportDetails: text("report_details"),
+    reportSubmittedAt: timestamp("report_submitted_at", { withTimezone: true }),
+    reportSubmittedBy: uuid("report_submitted_by").references(() => appUser.id),
+    /** First look by the branch manager or company manager (stops the step-by-step alert). */
+    seenAt: timestamp("seen_at", { withTimezone: true }),
+    seenBy: uuid("seen_by").references(() => appUser.id),
+    /** Company manager's review of the full report. */
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewedBy: uuid("reviewed_by").references(() => appUser.id),
+    reviewNote: text("review_note"),
+    status: text("status").notNull().default("open"),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    closedBy: uuid("closed_by").references(() => appUser.id),
+    closeNote: text("close_note"),
+    /** Offline short form: a resend is harmless (spec §8.7, §13). */
+    clientUuid: uuid("client_uuid").unique(),
+    pickupRefusalId: uuid("pickup_refusal_id").references(() => pickupRefusal.id),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    index("incident_branch_idx").on(t.branchId, t.occurredAt),
+    index("incident_status_idx").on(t.status),
+    check("incident_status_check", sql`${t.status} IN ('open', 'under_review', 'closed')`),
+    check("incident_severity_check", sql`${t.severity} IN ('minor', 'moderate', 'serious', 'critical')`),
+    check(
+      "incident_category_check",
+      sql`${t.category} IN ('injury', 'head_injury', 'illness', 'allergic_reaction', 'behaviour', 'child_unaccounted', 'pickup_unapproved', 'child_protection', 'hazard', 'other')`,
+    ),
+  ],
+);
+
+/** A child, a staff member or another person in an incident (spec §7.6). */
+export const incidentPerson = pgTable(
+  "incident_person",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    incidentId: uuid("incident_id")
+      .notNull()
+      .references(() => incident.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    studentId: uuid("student_id").references(() => student.id),
+    staffId: uuid("staff_id").references(() => staff.id),
+    /** Someone who is neither a child nor staff here (a visitor, a parent). */
+    personName: text("person_name"),
+    role: text("role").notNull(),
+    ...tracked,
+  },
+  (t) => [
+    index("incident_person_incident_idx").on(t.incidentId),
+    check("incident_person_role_check", sql`${t.role} IN ('injured', 'involved', 'witness')`),
+    check("incident_person_who_check", sql`num_nonnulls(${t.studentId}, ${t.staffId}, ${t.personName}) = 1`),
+  ],
+);
+
+/** Corrective action with an owner and a due date (spec §8.7). */
+export const incidentAction = pgTable(
+  "incident_action",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    incidentId: uuid("incident_id")
+      .notNull()
+      .references(() => incident.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    description: text("description").notNull(),
+    ownerUserId: uuid("owner_user_id")
+      .notNull()
+      .references(() => appUser.id),
+    dueOn: date("due_on").notNull(),
+    doneAt: timestamp("done_at", { withTimezone: true }),
+    doneBy: uuid("done_by").references(() => appUser.id),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [index("incident_action_incident_idx").on(t.incidentId), index("incident_action_owner_idx").on(t.ownerUserId, t.dueOn)],
+);
+
+/** Photos and documents of an incident's full report. */
+export const incidentFile = pgTable(
+  "incident_file",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    incidentId: uuid("incident_id")
+      .notNull()
+      .references(() => incident.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    attachmentId: uuid("attachment_id")
+      .notNull()
+      .references(() => attachment.id),
+    ...tracked,
+  },
+  (t) => [index("incident_file_incident_idx").on(t.incidentId)],
+);
+
+export const ISSUE_CATEGORIES = ["maintenance", "equipment", "supplies", "cleaning", "safety", "it", "other"] as const;
+export const ISSUE_PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+
+/** Spec §7.6 / §8.8 `issue`: maintenance, equipment, supplies. */
+export const issue = pgTable(
+  "issue",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    category: text("category").notNull(),
+    title: text("title").notNull(),
+    details: text("details"),
+    priority: text("priority").notNull().default("normal"),
+    photoAttachmentId: uuid("photo_attachment_id").references(() => attachment.id),
+    assignedTo: uuid("assigned_to").references(() => appUser.id),
+    dueOn: date("due_on"),
+    status: text("status").notNull().default("open"),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedBy: uuid("resolved_by").references(() => appUser.id),
+    resolutionNote: text("resolution_note"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    index("issue_branch_idx").on(t.branchId, t.status),
+    index("issue_assigned_idx").on(t.assignedTo),
+    check("issue_status_check", sql`${t.status} IN ('open', 'in_progress', 'resolved')`),
+    check("issue_priority_check", sql`${t.priority} IN ('low', 'normal', 'high', 'urgent')`),
+    check("issue_category_check", sql`${t.category} IN ('maintenance', 'equipment', 'supplies', 'cleaning', 'safety', 'it', 'other')`),
+  ],
+);
+
+/**
+ * One alert (spec §10): a critical one goes to everyone at once and repeats until one person
+ * acknowledges it; a same-day one goes step by step (branch manager → company manager → owner).
+ * dedupe_key stops the same thing raising two alerts.
+ */
+export const alert = pgTable(
+  "alert",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    key: text("key").notNull(),
+    tier: text("tier").notNull(),
+    subjectTable: text("subject_table"),
+    subjectId: uuid("subject_id"),
+    dedupeKey: text("dedupe_key").notNull().unique(),
+    step: integer("step").notNull().default(1),
+    raisedAt: timestamp("raised_at", { withTimezone: true }).notNull().defaultNow(),
+    nextStepAt: timestamp("next_step_at", { withTimezone: true }),
+    lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+    sendCount: integer("send_count").notNull().default(0),
+    acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+    acknowledgedBy: uuid("acknowledged_by").references(() => appUser.id),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    index("alert_branch_idx").on(t.branchId, t.raisedAt),
+    index("alert_open_idx").on(t.tier).where(sql`${t.acknowledgedAt} IS NULL AND ${t.resolvedAt} IS NULL`),
+    check("alert_tier_check", sql`${t.tier} IN ('critical', 'same_day', 'info')`),
+  ],
+);
+
+/** An alert as it reaches one person, in the app (spec §7.7 `notification`). */
+export const notification = pgTable(
+  "notification",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    alertId: uuid("alert_id")
+      .notNull()
+      .references(() => alert.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => appUser.id, { onDelete: "cascade" }),
+    step: integer("step").notNull().default(1),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    ...tracked,
+  },
+  (t) => [unique("notification_alert_user").on(t.alertId, t.userId), index("notification_user_idx").on(t.userId, t.createdAt)],
+);
+
+/**
+ * A push or SMS to send for a notification. The text carries no personal data (rule 9):
+ * "Critical incident at Norvale — open the app". Sent by the alert job (src/lib/notifier.ts).
+ */
+export const notificationDelivery = pgTable(
+  "notification_delivery",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    notificationId: uuid("notification_id")
+      .notNull()
+      .references(() => notification.id, { onDelete: "cascade" }),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    channel: text("channel").notNull(),
+    dueAt: timestamp("due_at", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    status: text("status").notNull().default("pending"),
+    detail: text("detail"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("notification_delivery_due_idx").on(t.dueAt).where(sql`${t.status} = 'pending'`),
+    check("notification_delivery_channel_check", sql`${t.channel} IN ('push', 'sms')`),
+    check("notification_delivery_status_check", sql`${t.status} IN ('pending', 'sending', 'sent', 'failed', 'skipped')`),
+  ],
+);
+
+/** A phone that agreed to receive push alerts (Web Push). */
+export const pushSubscription = pgTable(
+  "push_subscription",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => appUser.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("push_subscription_user_endpoint").on(t.userId, t.endpoint)],
+);
+
+// ---------------------------------------------------------------------------
+// Phase 6: closing (spec §6.1, §6.2, §7.5, §7.7, §8.9, §8.10, §9).
+// The branch manager closes each day; the accountant closes each month with the Excel template.
+// ---------------------------------------------------------------------------
+
+export const DAILY_CLOSE_SECTIONS = ["attendance", "pickups", "staff", "payments", "expenses", "incidents", "issues"] as const;
+
+/**
+ * One closed day of one branch (spec §8.9). Each section of `sections` is
+ * { state: 'correct' | 'fix' | 'none', count, note? }: 'none' is a confirmed zero ("Yes, none").
+ */
+export const dailyClose = pgTable(
+  "daily_close",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    date: date("date").notNull(),
+    sections: jsonb("sections").notNull(),
+    notes: text("notes"),
+    closedBy: uuid("closed_by").references(() => appUser.id),
+    closedAt: timestamp("closed_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Closed after the evening deadline (spec §8.9 step 5). */
+    isLate: boolean("is_late").notNull().default(false),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [unique("daily_close_branch_date").on(t.branchId, t.date)],
+);
+
+/** A month of one branch: open, or closed by the accountant (figures Verified). Reopening needs the owner. */
+export const periodClose = pgTable(
+  "period_close",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    month: date("month").notNull(),
+    status: text("status").notNull().default("open"),
+    closedBy: uuid("closed_by").references(() => appUser.id),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    reopenRequestedBy: uuid("reopen_requested_by").references(() => appUser.id),
+    reopenRequestedAt: timestamp("reopen_requested_at", { withTimezone: true }),
+    reopenReason: text("reopen_reason"),
+    reopenedBy: uuid("reopened_by").references(() => appUser.id),
+    reopenedAt: timestamp("reopened_at", { withTimezone: true }),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    unique("period_close_branch_month").on(t.branchId, t.month),
+    check("period_close_status_check", sql`${t.status} IN ('open', 'closed')`),
+    check("period_close_month_check", sql`extract(day from ${t.month}) = 1`),
+  ],
+);
+
+/**
+ * The accountant's month-close lines (spec §7.5, §8.10): 'check' lines compare the app's figure with the
+ * accountant's (a difference needs a note); 'central' lines are costs not recorded in the app (salaries,
+ * rent …); 'balance' lines are the reconciled cash and bank. Each upload is one import batch (rollback).
+ */
+export const periodImportLine = pgTable(
+  "period_import_line",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    periodCloseId: uuid("period_close_id")
+      .notNull()
+      .references(() => periodClose.id),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    batchId: uuid("batch_id")
+      .notNull()
+      .references(() => importBatch.id),
+    kind: text("kind").notNull(),
+    lineKey: text("line_key").notNull(),
+    categoryId: uuid("category_id").references(() => expenseCategory.id),
+    appPiastres: bigint("app_piastres", { mode: "bigint" }),
+    amountPiastres: bigint("amount_piastres", { mode: "bigint" }).notNull(),
+    note: text("note"),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [
+    index("period_import_line_period_idx").on(t.periodCloseId),
+    check("period_import_line_kind_check", sql`${t.kind} IN ('check', 'central', 'balance')`),
+  ],
+);
+
+/** Reconciled cash and bank at the end of a month (spec §7.5), from the month close. */
+export const balanceSnapshot = pgTable(
+  "balance_snapshot",
+  {
+    id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    month: date("month").notNull(),
+    cashPiastres: bigint("cash_piastres", { mode: "bigint" }),
+    bankPiastres: bigint("bank_piastres", { mode: "bigint" }),
+    batchId: uuid("batch_id").references(() => importBatch.id),
+    isDemo: boolean("is_demo").notNull().default(false),
+    ...tracked,
+  },
+  (t) => [index("balance_snapshot_branch_month_idx").on(t.branchId, t.month)],
+);
+
+/** The day's figures kept every night (spec §7.7), so trends never change after the fact. */
+export const kpiDailySnapshot = pgTable(
+  "kpi_daily_snapshot",
+  {
+    branchId: uuid("branch_id")
+      .notNull()
+      .references(() => branch.id),
+    date: date("date").notNull(),
+    kpiKey: text("kpi_key").notNull(),
+    value: numeric("value"),
+    status: text("status").notNull(),
+    coverage: text("coverage"),
+    takenAt: timestamp("taken_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.branchId, t.date, t.kpiKey] }),
+    check("kpi_snapshot_status_check", sql`${t.status} IN ('verified', 'provisional', 'incomplete', 'not_submitted', 'confirmed')`),
   ],
 );

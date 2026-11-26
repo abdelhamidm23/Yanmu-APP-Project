@@ -1,6 +1,7 @@
 /**
  * Removes every demo child, family, guardian, enrollment, waitlist entry, staff member,
- * attendance record and demo money (invoices, payments, cash days, expenses, approvals) (spec §16).
+ * attendance record, demo money (invoices, payments, cash days, expenses, approvals), demo incidents and issues,
+ * and demo daily and month closes (spec §16).
  * Rooms stay: they are settings, and the owner may have renamed them.
  * Usage: pnpm seed:wipe-demo
  */
@@ -24,6 +25,26 @@ export async function wipeDemo(db: PostgresJsDatabase<any>) {
     const demoExp = sql`(select id from expense where is_demo)`;
     const demoCn = sql`(select id from credit_note where is_demo or invoice_id in (select id from invoice where is_demo))`;
     const demoReq = sql`(select id from approval_request where expense_id in ${demoExp} or credit_note_id in ${demoCn})`;
+    // Safety (Phase 5): demo incidents, issues and their alerts, before the children they point at.
+    const demoIncident = sql`(select id from incident where is_demo or pickup_refusal_id in (select id from pickup_refusal where student_id in ${demo}))`;
+    const demoAlert = sql`(select id from alert where is_demo or subject_id in ${demoIncident} or subject_id in (select id from issue where is_demo))`;
+    // Closing (Phase 6): demo months are opened again so their lines can go; figures kept each night are rebuilt by the jobs.
+    await tx.execute(sql`update period_close set status = 'open' where is_demo`);
+    await tx.execute(sql`delete from balance_snapshot where is_demo`);
+    await tx.execute(sql`delete from period_import_line where is_demo`);
+    await tx.execute(sql`delete from import_batch b where kind = 'month_close' and file_name like '%(demo).xlsx' and not exists (select 1 from period_import_line l where l.batch_id = b.id)
+      and not exists (select 1 from balance_snapshot s where s.batch_id = b.id)`);
+    await tx.execute(sql`delete from period_close p where is_demo and not exists (select 1 from period_import_line l where l.period_close_id = p.id)`);
+    await tx.execute(sql`delete from daily_close where is_demo`);
+    await tx.execute(sql`delete from kpi_daily_snapshot`);
+    await tx.execute(sql`delete from notification_delivery where notification_id in (select id from notification where alert_id in ${demoAlert})`);
+    await tx.execute(sql`delete from notification where alert_id in ${demoAlert}`);
+    await tx.execute(sql`delete from alert where id in ${demoAlert}`);
+    await tx.execute(sql`delete from incident_file where incident_id in ${demoIncident}`);
+    await tx.execute(sql`delete from incident_action where incident_id in ${demoIncident}`);
+    await tx.execute(sql`delete from incident_person where incident_id in ${demoIncident} or student_id in ${demo}`);
+    await tx.execute(sql`delete from incident where id in ${demoIncident}`);
+    await tx.execute(sql`delete from issue where is_demo`);
     await tx.execute(sql`delete from payment_allocation where payment_id in ${demoPay} or invoice_id in ${demoInv}`);
     await tx.execute(sql`delete from approval_step where request_id in ${demoReq}`);
     await tx.execute(sql`delete from approval_request where id in ${demoReq}`);

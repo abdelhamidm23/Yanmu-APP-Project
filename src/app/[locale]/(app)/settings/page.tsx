@@ -11,7 +11,7 @@ export default async function SettingsHome({ params }: { params: Promise<{ local
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title={t("title")} />
-      <SettingsMenu locale={locale} admin={isOrgAdmin(user)} />
+      <SettingsMenu admin={isOrgAdmin(user)} />
     </div>
   );
 }

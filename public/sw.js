@@ -58,3 +58,44 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+/*
+ * Alerts (spec §10). The message only names the kind of alert and the branch (rule 9); the details
+ * are in the app. Critical alerts stay on screen until tapped.
+ */
+self.addEventListener("push", (event) => {
+  let msg = { title: "Yanmu", body: "", url: "/", critical: false };
+  try {
+    msg = { ...msg, ...(event.data ? event.data.json() : {}) };
+  } catch {
+    // Not JSON: show the default.
+  }
+  event.waitUntil(
+    self.registration.showNotification(msg.title, {
+      body: msg.body,
+      data: { url: msg.url },
+      tag: msg.critical ? "critical" : undefined,
+      renotify: Boolean(msg.critical),
+      requireInteraction: Boolean(msg.critical),
+      vibrate: msg.critical ? [300, 150, 300, 150, 300] : undefined,
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin);
+  if (url.origin !== self.location.origin) return;
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const w of wins) {
+        if (new URL(w.url).origin === self.location.origin && "focus" in w) {
+          await w.navigate(url.href).catch(() => undefined);
+          return w.focus();
+        }
+      }
+      return self.clients.openWindow(url.href);
+    })(),
+  );
+});

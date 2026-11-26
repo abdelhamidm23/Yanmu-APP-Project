@@ -78,3 +78,28 @@ export function formatTimestamp(date: Date, locale: Locale, digits: Digits): str
     hourCycle: "h23",
   }).format(date);
 }
+
+/**
+ * Short money for dashboard tiles (spec §11.2): 663,400 EGP → "663.4K" / "٦٦٣٫٤ ألف". Integer arithmetic only
+ * (rule 5); the rounded figure is passed to Intl as a decimal string, never through a float.
+ */
+export function formatPiastresCompact(piastres: bigint, locale: Locale, digits: Digits): string {
+  const negative = piastres < 0n;
+  const abs = negative ? -piastres : piastres;
+  const nf = (s: string, frac: number) =>
+    new Intl.NumberFormat(intlLocale(locale, digits), { minimumFractionDigits: frac, maximumFractionDigits: frac, useGrouping: true }).format(
+      s as unknown as number,
+    );
+  let body: string;
+  if (abs < 100_000n) {
+    // Under EGP 1,000: whole pounds.
+    body = nf(((abs + 50n) / 100n).toString(), 0);
+  } else if (abs < 99_995_000n) {
+    const tenths = (abs + 5_000n) / 10_000n; // tenths of a thousand pounds
+    body = `${nf(`${tenths / 10n}.${tenths % 10n}`, 1)}${locale === "ar" ? " ألف" : "K"}`;
+  } else {
+    const tenths = (abs + 5_000_000n) / 10_000_000n; // tenths of a million pounds
+    body = `${nf(`${tenths / 10n}.${tenths % 10n}`, 1)}${locale === "ar" ? " مليون" : "M"}`;
+  }
+  return negative ? `−${body}` : body;
+}
