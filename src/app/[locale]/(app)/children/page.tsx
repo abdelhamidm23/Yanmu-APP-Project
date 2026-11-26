@@ -172,7 +172,7 @@ export default async function ChildrenPage({
         <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface" data-testid="child-list">
           {rows.map((c) => (
             <li key={c.id}>
-              <Link href={`/children/${c.id}`} className="flex min-h-14 flex-col gap-1 px-4 py-3 hover:bg-bg">
+              <Link href={`/children/${c.id}`} className="flex min-h-14 flex-col gap-1 px-4 py-3 hover:bg-bg" data-testid="child-row">
                 <span className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-row-title font-semibold">{locale === "ar" ? c.fullNameAr : c.fullNameEn}</span>
                   <span className="figure text-meta text-muted">{c.studentNo}</span>

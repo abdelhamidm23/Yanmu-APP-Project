@@ -1,10 +1,9 @@
 import { getTranslations } from "next-intl/server";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Link } from "@/i18n/navigation";
+import { MoreMenu, type MenuGroup } from "@/components/MoreMenu";
 
 /**
  * Settings, split into the groups Khaled asked for (review of phases 0 to 3):
- * nursery setup, money, people and access, and records. Shown on the More page and on /settings.
+ * nursery setup, money settings, people and access, and records. Shown on the More page and on /settings.
  */
 export const SETTINGS_GROUPS = [
   {
@@ -28,33 +27,18 @@ export const SETTINGS_GROUPS = [
   { key: "records", items: [{ href: "/settings/audit", key: "audit", admin: true }] },
 ] as const;
 
-export async function SettingsMenu({ locale, admin }: { locale: string; admin: boolean }) {
+/** The settings groups this person may open, ready for `MoreMenu`. */
+export async function settingsGroups(admin: boolean): Promise<MenuGroup[]> {
   const t = await getTranslations("settings");
-  const Chevron = locale === "ar" ? ChevronLeft : ChevronRight;
-  return (
-    <>
-      {SETTINGS_GROUPS.map((g) => {
-        const items = g.items.filter((i) => admin || !i.admin);
-        if (items.length === 0) return null;
-        return (
-          <section key={g.key} className="flex flex-col gap-2" data-testid={`settings-group-${g.key}`}>
-            <h2 className="text-section-title font-semibold">{t(`groups.${g.key}`)}</h2>
-            <ul className="flex flex-col divide-y divide-divider rounded-card border border-border bg-surface">
-              {items.map((i) => (
-                <li key={i.key}>
-                  <Link href={i.href} className="flex min-h-16 items-center gap-3 px-4 py-3" data-testid={`settings-${i.key}`}>
-                    <span className="flex flex-1 flex-col">
-                      <span className="text-row-title font-semibold">{t(`menu.${i.key}`)}</span>
-                      <span className="text-meta text-muted">{t(`menu.${i.key}Help`)}</span>
-                    </span>
-                    <Chevron aria-hidden="true" className="size-5 text-muted" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
-    </>
-  );
+  return SETTINGS_GROUPS.map((g) => ({
+    testId: `settings-group-${g.key}`,
+    title: t(`groups.${g.key}`),
+    items: g.items
+      .filter((i) => admin || !i.admin)
+      .map((i) => ({ id: `settings-${i.key}`, href: i.href, title: t(`menu.${i.key}`), help: t(`menu.${i.key}Help`), icon: i.key })),
+  })).filter((g) => g.items.length > 0);
+}
+
+export async function SettingsMenu({ admin }: { admin: boolean }) {
+  return <MoreMenu groups={await settingsGroups(admin)} />;
 }

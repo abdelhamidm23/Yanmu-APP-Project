@@ -1,5 +1,7 @@
+import { Suspense } from "react";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { AppNav } from "@/components/AppNav";
+import { HeaderStart } from "@/components/BackButton";
 import { DemoPill } from "@/components/DemoPill";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { NAV_BY_ROLE } from "@/lib/roles";
@@ -40,7 +42,9 @@ export default async function AppLayout({
       </a>
       <header className="sticky top-0 z-30 border-b border-border bg-bg/95 backdrop-blur">
         <div className="mx-auto flex min-h-14 max-w-3xl items-center justify-between gap-3 px-4 md:ms-60 md:max-w-none md:px-8">
-          <span className="text-row-title font-semibold text-brand">{t("app.name")}</span>
+          <Suspense fallback={<span className="text-row-title font-semibold text-brand">{t("app.name")}</span>}>
+            <HeaderStart tabs={items.map((i) => i.section)} appName={t("app.name")} />
+          </Suspense>
           <div className="flex items-center gap-2">
             <DemoPill />
             <Link

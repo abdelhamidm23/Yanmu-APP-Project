@@ -212,7 +212,7 @@ test("a ratio breach shows on Today and the roster fixes it", async ({ page }) =
 test("quick PIN sign-in on a shared class phone", async ({ page }) => {
   await signIn(page, "teacher@yanmu.test", "en");
   await expect(page).toHaveURL(/\/en\/my-class$/);
-  await page.goto("/en/more");
+  await page.goto("/en/more/account");
   await page.locator("#pin").fill("1234");
   await page.locator("#pinAgain").fill("1234");
   await page.getByTestId("save-pin").click();
@@ -222,6 +222,7 @@ test("quick PIN sign-in on a shared class phone", async ({ page }) => {
   await page.getByTestId("save-pin").click();
   await expect(page.locator("main")).toContainText("Quick sign-in is ready on this phone.");
 
+  await page.goto("/en/more");
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/en\/login$/);
   const quick = page.getByTestId("pin-login");

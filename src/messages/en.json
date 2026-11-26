@@ -13,6 +13,7 @@
     "notFoundTitle": "Page not found",
     "notFoundBody": "This page does not exist, or your role cannot open it.",
     "goHome": "Go to my start screen",
+    "back": "Back",
     "language": "Language",
     "arabic": "العربية",
     "english": "English",
@@ -185,9 +186,12 @@
     "pinSave": "Save PIN",
     "pinForget": "Forget me on this phone",
     "groups": {
-      "daily": "Daily work",
-      "account": "My account",
-      "money": "Money"
+      "daily": "Today's work",
+      "people": "Children and staff",
+      "safety": "Safety and maintenance",
+      "money": "Money",
+      "closing": "Closing and figures",
+      "account": "My account"
     },
     "moneyLink": "This month's billing, collections and late fees",
     "invoicesLink": "Invoices, overdue families and late fees today",
@@ -202,7 +206,11 @@
     "alertsLink": "Your alerts, incidents waiting for you, and approvals.",
     "dailyCloseLink": "Check the day's records and confirm them, section by section",
     "figuresLink": "Today's figures with their status, by branch or all branches",
-    "monthCloseLink": "Excel pack, month-close template and closing the month"
+    "monthCloseLink": "Excel pack, month-close template and closing the month",
+    "accountHelp": "Language, alerts, quick PIN and security",
+    "search": "Find a screen",
+    "searchPlaceholder": "Find a screen, e.g. invoices",
+    "searchEmpty": "No screen matches “{query}”. Try another word."
   },
   "settings": {
     "title": "Settings",
@@ -592,7 +600,7 @@
       "setup": "Nursery setup",
       "people": "People and access",
       "records": "Records",
-      "money": "Money"
+      "money": "Money settings"
     }
   },
   "children": {
